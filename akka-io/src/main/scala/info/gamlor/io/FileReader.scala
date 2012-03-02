@@ -3,11 +3,8 @@ package info.gamlor.io
 import akka.util.ByteString
 import java.nio.ByteBuffer
 import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
-import java.util.concurrent.{TimeUnit, Callable}
-import javax.swing.JList
 import java.nio.file._
-import akka.dispatch.{Future, ExecutionContextExecutorService, ExecutionContext, Promise}
-import java.util.{HashSet, Collection}
+import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 
 
@@ -44,6 +41,21 @@ class FileReader(val channel : AsynchronousFileChannel,private implicit val cont
       def completed(result: java.lang.Integer, attachment: Any) {
         readBuffer.flip()
         promise.success(ByteString(readBuffer))
+      }
+
+      def failed(exc: Throwable, attachment: Any) {
+        promise.failure(exc)
+      }
+    })
+    promise
+  }
+
+  def write(startPostion:Long,dataToWrite:ByteString):Future[Unit]={
+    val writeBuffer = dataToWrite.asByteBuffer
+    val promise = Promise[Unit]
+    channel.write(writeBuffer,startPostion,null,new CompletionHandler[java.lang.Integer, Any] {
+      def completed(result: java.lang.Integer, attachment: Any) {
+        promise.success()
       }
 
       def failed(exc: Throwable, attachment: Any) {
