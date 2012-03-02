@@ -43,14 +43,9 @@ object AkkaAsyncModules extends Build  {
 object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "1.6.1" % "test"
-  val netty = "org.jboss.netty" % "netty" % "3.2.5.Final"
-  val asyncHttp = "com.ning" % "async-http-client" % "1.6.5"
 
-  val akkaTestKit = "com.typesafe.akka" % "akka-testkit" % "2.0-RC2" % "test"
-  val akkaActors = "com.typesafe.akka" % "akka-actor" % "2.0-RC2"
-  val akkaRemoteActors = "se.scalablesolutions.akka" % "akka-remote" % "1.2"
+  val akkaTestKit = "com.typesafe.akka" % "akka-testkit" % "2.0-RC3" % "test"
+  val akkaActors = "com.typesafe.akka" % "akka-actor" % "2.0-RC3"
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
-  val h2Database = "com.h2database" % "h2" % "1.3.161"
-  val scalaQuery = "org.scalaquery" % "scalaquery_2.9.0-1" % "0.9.5"
 }
