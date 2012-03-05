@@ -9,6 +9,7 @@ import akka.util.duration._
 import com.ning.http.client.{HttpResponseStatus, HttpResponseBodyPart, HttpResponseHeaders, AsyncHandler}
 import java.util.concurrent.atomic.AtomicBoolean
 import com.ning.http.client.AsyncHandler.STATE
+import java.util.concurrent.CancellationException
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -72,12 +73,42 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
           })
 
           val result = Await.result(future, 5 seconds)
-          onCompletedCalled.get() must be (true)
-          onStatusReceivedCalled.get() must be (true)
-          onBodyPartReceivedCalled.get() must be (true)
-          onHeadersReceivedCalled.get() must be (true)
-          result must be ("final result")
+          onCompletedCalled.get() must be(true)
+          onStatusReceivedCalled.get() must be(true)
+          onBodyPartReceivedCalled.get() must be(true)
+          onHeadersReceivedCalled.get() must be(true)
+          result must be("final result")
         })
+    }
+    it("can cancel processing") {
+      TestWebServer.withTestServer(TestWebServer.EchoServer,
+        server => {
+          val result = WebClient(system).preparePost(server.url)
+            .setBody("This is the data we post").execute(new AsyncHandler[String] {
+            def onCompleted() = {
+              "final result"
+            }
+
+            def onStatusReceived(responseStatus: HttpResponseStatus) = {
+              STATE.ABORT;
+            }
+
+            def onBodyPartReceived(bodyPart: HttpResponseBodyPart) = {
+              STATE.CONTINUE;
+            }
+
+            def onThrowable(t: Throwable) {}
+
+            def onHeadersReceived(headers: HttpResponseHeaders) = {
+              STATE.CONTINUE;
+            }
+          })
+
+          val content = Await.ready(result, 5 seconds)
+          content.value.get.isLeft must be(true)
+          content.value.get.left.get.isInstanceOf[CancellationException] must be (true)
+        })
+
     }
     it("report failure") {
       TestWebServer.withTestServerExtended(TestWebServer.FailCompletly,

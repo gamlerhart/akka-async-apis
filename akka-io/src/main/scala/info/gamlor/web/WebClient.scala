@@ -4,6 +4,8 @@ import akka.actor.{Extension, ExtensionIdProvider, ExtendedActorSystem, Extensio
 import akka.util.ByteString
 import com.ning.http.client._
 import akka.dispatch.{ExecutionContext, Promise, Future}
+import com.ning.http.client.AsyncHandler.STATE
+import java.util.concurrent.CancellationException
 
 
 /**
@@ -61,16 +63,29 @@ class RequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#Bound
         r
       }
 
-      def onStatusReceived(responseStatus: HttpResponseStatus) = handler.onStatusReceived(responseStatus)
+      def onStatusReceived(responseStatus: HttpResponseStatus) = {
+        reportCancelledStatus(()=>handler.onStatusReceived(responseStatus))
+      }
 
-      def onBodyPartReceived(bodyPart: HttpResponseBodyPart) = handler.onBodyPartReceived(bodyPart)
+      def onBodyPartReceived(bodyPart: HttpResponseBodyPart) = reportCancelledStatus(()=>handler.onBodyPartReceived(bodyPart))
 
       def onThrowable(t: Throwable) {
         handler.onThrowable(t)
         result.failure(t)
       }
 
-      def onHeadersReceived(headers: HttpResponseHeaders)  = handler.onHeadersReceived(headers)
+      def onHeadersReceived(headers: HttpResponseHeaders)  =  reportCancelledStatus(()=>handler.onHeadersReceived(headers))
+
+      private def reportCancelledStatus(originalCall: ()=>AsyncHandler.STATE): AsyncHandler.STATE = {
+        val status = originalCall()
+        status match {
+          case STATE.ABORT => {
+            result.failure(throw new CancellationException("Processing of this request has been cancelled"))
+            status
+          }
+          case x => x
+        }
+      }
     })
     result
   }
