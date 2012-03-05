@@ -21,10 +21,8 @@ object WebClient
   override def lookup = this
 
   override def createExtension(system: ExtendedActorSystem) = {
-    val builder = new AsyncHttpClientConfig.Builder();
-    builder.setFollowRedirects(true)
-    builder.setMaximumNumberOfRedirects(5)
-    val client = new WebClient(system.dispatcher,new AsyncHttpClient(builder.build()))
+    val cfg = WebClientSettings.createConfig(system.settings.config)
+    val client = new WebClient(system.dispatcher,new AsyncHttpClient(cfg))
     system.registerOnTermination(()=>client.asyncHttpClient.close())
     client
   }
