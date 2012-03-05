@@ -1,15 +1,15 @@
 package info.gamlor.web
 
 import akka.testkit.TestKit
-import info.gamlor.io.TestActorSystem
 import org.scalatest.Spec
 import org.scalatest.matchers.MustMatchers
 import akka.util.duration._
 import java.util.concurrent.atomic.AtomicBoolean
 import com.ning.http.client.AsyncHandler.STATE
-import java.util.concurrent.CancellationException
 import akka.dispatch.Await
 import com.ning.http.client._
+import info.gamlor.io.{TestFiles, TestActorSystem}
+import java.util.concurrent.{TimeoutException, CancellationException}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -34,6 +34,31 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
     }
     it("heads up") {
       roundTripHeadersOnly(url=>WebClient(system).prepareGet(url))
+    }
+    it("can post file") {
+      TestWebServer.withTestServer(TestWebServer.EchoServer,
+        server => {
+          val future = WebClient(system).preparePost(server.url)
+            .setBody(TestFiles.inTestFolder("helloWorld.txt")).execute()
+
+          val result = Await.result(future, 5 seconds)
+
+          result.getResponseBody must not be ("Hello World")
+        })
+    }
+    it("can timeout quickly") {
+      TestWebServer.withTestServer(TestWebServer.VerySlowServer,
+        server => {
+          val requestConfig = new PerRequestConfig();
+          requestConfig.setRequestTimeoutInMs(1000);
+          val future = WebClient(system).prepareGet(server.url)
+            .setPerRequestConfig(requestConfig).execute()
+
+
+          val content = Await.ready(future, 5 seconds)
+          content.value.get.isLeft must be(true)
+          content.value.get.left.get.isInstanceOf[TimeoutException] must be(true)
+        })
     }
     it("has events") {
       TestWebServer.withTestServer(TestWebServer.EchoServer,

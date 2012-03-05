@@ -28,32 +28,39 @@ object TestWebServer {
   }
 
   val HelloWorld = (req: Request, response: Response) => {
+    addDefaultHeaders(response)
     val body = response.getPrintStream;
-    val time = System.currentTimeMillis();
-
-    response.set("Content-Type", "text/plain");
-    response.set("Server", "HelloWorld/1.0 (Simple 4.0)");
-    response.setDate("Date", time);
-    response.setDate("Last-Modified", time);
 
     body.println("Hello World");
     body.close();
   }
-  val EchoServer = (req: Request, response: Response) => {
-    val body = response.getPrintStream;
-    val time = System.currentTimeMillis();
 
-    response.set("Content-Type", "text/plain");
-    response.set("Server", "HelloWorld/1.0 (Simple 4.0)");
-    response.setDate("Date", time);
-    response.setDate("Last-Modified", time);
+  val EchoServer = (req: Request, response: Response) => {
+
+    addDefaultHeaders(response)
+    val body = response.getPrintStream;
 
     body.println(req.getContent);
+    body.close();
+  }
+  val VerySlowServer = (req: Request, response: Response) => {
+
+    Thread.sleep(7000)
+    addDefaultHeaders(response)
+    val body = response.getPrintStream;
+    body.println("Hello World");
     body.close();
   }
   val FailCompletly = (req: Request, response: Response, server: TestWebServer) => {
     server.close()
     throw new RuntimeException("Simulated Error on the Server")
+  }
+  private def addDefaultHeaders(response: Response) {
+    val time = System.currentTimeMillis();
+    response.set("Content-Type", "text/plain");
+    response.set("Server", "HelloWorld/1.0 (Simple 4.0)");
+    response.setDate("Date", time);
+    response.setDate("Last-Modified", time);
   }
 }
 

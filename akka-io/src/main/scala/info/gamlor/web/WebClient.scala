@@ -6,6 +6,8 @@ import com.ning.http.client._
 import akka.dispatch.{ExecutionContext, Promise, Future}
 import com.ning.http.client.AsyncHandler.STATE
 import java.util.concurrent.CancellationException
+import java.nio.file.Path
+import java.io.File
 
 
 /**
@@ -52,6 +54,7 @@ class WebClient(private val context:ExecutionContext,
 
 class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#BoundRequestBuilder,
                       private val context:ExecutionContext) {
+
   def execute():Future[Response] = {
     val result = Promise[Response]()(context)
     unterlyingRequestBuilder.execute(new AsyncCompletionHandler[Response] {
@@ -137,6 +140,12 @@ class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#Bo
     unterlyingRequestBuilder.setBody(data.toArray)
     this
   }
+  def setBody(path: File)={
+    unterlyingRequestBuilder.setBody(path)
+    this
+  }
+
+  def setBody(path: Path):WebRequestBuilder  =setBody(path.toFile)
 
 
   def setBody(data: String) = {
@@ -147,6 +156,11 @@ class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#Bo
 
   def setHeader(name: String, value: String) = {
     unterlyingRequestBuilder.setHeader(name, value)
+    this
+  }
+
+  def setPerRequestConfig(config:PerRequestConfig) = {
+    unterlyingRequestBuilder.setPerRequestConfig(config)
     this
   }
 
