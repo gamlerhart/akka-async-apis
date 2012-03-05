@@ -33,7 +33,13 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
       roundTripWithBody(url=>WebClient(system).prepareDelete(url))
     }
     it("heads up") {
-      roundTripHeadersOnly(url=>WebClient(system).prepareGet(url))
+      TestWebServer.withTestServer(TestWebServer.EchoServer,
+        server => {
+          val future = WebClient(system).prepareHead(server.url).execute()
+
+          val result = Await.result(future, 5 seconds)
+          server.amountOfProcessedRequests must be (1)
+        })
     }
     it("can post file") {
       TestWebServer.withTestServer(TestWebServer.EchoServer,

@@ -4,6 +4,7 @@ import org.simpleframework.http.core.Container
 import org.simpleframework.transport.connect.SocketConnection
 import java.net.{ServerSocket, InetSocketAddress}
 import org.simpleframework.http.{Request, Response}
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -78,12 +79,15 @@ object TestWebServer {
 
 
 class TestWebServer(serverBehavior: (Request, Response, TestWebServer) => Unit) {
+  private val requestCounter = new AtomicInteger(0)
 
+  def amountOfProcessedRequests = requestCounter.get()
 
   val port = findFreePort()
   val url = "http://localhost:" + port
   private val connection = new SocketConnection(new Container {
     def handle(req: Request, resp: Response) {
+      requestCounter.incrementAndGet()
       serverBehavior(req, resp, TestWebServer.this)
     }
   });
