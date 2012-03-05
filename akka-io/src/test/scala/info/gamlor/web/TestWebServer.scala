@@ -20,7 +20,6 @@ object TestWebServer {
     } finally {
       server.close()
     }
-
   }
 
   val HelloWorld = (req: Request, response: Response) => {
@@ -40,14 +39,16 @@ object TestWebServer {
 
 class TestWebServer(serverBehavior: (Request, Response) => Unit) {
 
+
   val port = findFreePort()
+  val url = "http://localhost:"+port
   private val connection = new SocketConnection(new Container {
     def handle(req: Request, resp: Response) {
       serverBehavior(req, resp)
     }
   });
 
-  connection.connect(new InetSocketAddress(8080));
+  connection.connect(new InetSocketAddress(port));
 
 
   def close() {
