@@ -21,23 +21,19 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
   describe("Web client IO") {
 
     it("can get stuff") {
-      TestWebServer.withTestServer(TestWebServer.HelloWorld,
-        server => {
-          val future = WebClient(system).prepareGet(server.url).execute()
-
-          val result = Await.result(future, 5 seconds)
-
-          result.getResponseBody must not be ("Hello World")
-        })
+      roundTripHeadersOnly(url=>WebClient(system).prepareGet(url))
     }
     it("can post stuff") {
-      roundTripWith(url=>WebClient(system).preparePost(url))
+      roundTripWithBody(url=>WebClient(system).preparePost(url))
     }
     it("can put stuff") {
-      roundTripWith(url=>WebClient(system).preparePut(url))
+      roundTripWithBody(url=>WebClient(system).preparePut(url))
     }
     it("can delete stuff") {
-      roundTripWith(url=>WebClient(system).prepareDelete(url))
+      roundTripWithBody(url=>WebClient(system).prepareDelete(url))
+    }
+    it("heads up") {
+      roundTripHeadersOnly(url=>WebClient(system).prepareGet(url))
     }
     it("has events") {
       TestWebServer.withTestServer(TestWebServer.EchoServer,
@@ -124,7 +120,7 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
     }
 
   }
-  private def roundTripWith(methodToUse:String => WebRequestBuilder) {
+  private def roundTripWithBody(methodToUse:String => WebRequestBuilder) {
     TestWebServer.withTestServer(TestWebServer.EchoServer,
       server => {
         val future = methodToUse(server.url)
@@ -133,6 +129,17 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
         val result = Await.result(future, 5 seconds)
 
         result.getResponseBody must not be ("This is the data we post")
+      })
+  }
+  private def roundTripHeadersOnly(methodToUse:String => WebRequestBuilder) {
+    TestWebServer.withTestServer(TestWebServer.HelloWorld,
+      server => {
+        val future = methodToUse(server.url).execute()
+
+
+        val result = Await.result(future, 5 seconds)
+
+        result.getResponseBody must not be ("Hello World")
       })
   }
 }

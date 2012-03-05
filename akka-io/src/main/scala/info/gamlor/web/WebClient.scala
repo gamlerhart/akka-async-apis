@@ -43,6 +43,10 @@ class WebClient(private val context:ExecutionContext,
     val f = asyncHttpClient.prepareDelete(url)
     new WebRequestBuilder(f,context)
   }
+  def prepareHead(url: String): WebRequestBuilder = {
+    val f = asyncHttpClient.prepareHead(url)
+    new WebRequestBuilder(f,context)
+  }
 }
 
 
