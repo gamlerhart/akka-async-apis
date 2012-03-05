@@ -29,6 +29,10 @@ class WebClient(private val context:ExecutionContext,
     val f = asyncHttpClient.prepareGet(url)
     new RequestBuilder(f,context)
   }
+  def preparePost(url: String): RequestBuilder = {
+    val f = asyncHttpClient.preparePost(url)
+    new RequestBuilder(f,context)
+  }
 }
 
 
@@ -48,27 +52,76 @@ class RequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#Bound
     })
     result
   }
+  def execute[A](handler: AsyncHandler[A]):Future[A] = {
+    val result = Promise[A]()(context)
+    unterlyingRequestBuilder.execute(new AsyncHandler[A] {
+      def onCompleted() = {
+        val r = handler.onCompleted();
+        result.success(r)
+        r
+      }
 
-  def addBodyPart(part: Part) = unterlyingRequestBuilder.addBodyPart(part)
+      def onStatusReceived(responseStatus: HttpResponseStatus) = handler.onStatusReceived(responseStatus)
 
-  def addCookie(cookie: Cookie) = unterlyingRequestBuilder.addCookie(cookie)
+      def onBodyPartReceived(bodyPart: HttpResponseBodyPart) = handler.onBodyPartReceived(bodyPart)
 
-  def addHeader(name: String, value: String) = unterlyingRequestBuilder.addHeader(name, value)
+      def onThrowable(t: Throwable) {
+        handler.onThrowable(t)
+        result.failure(t)
+      }
 
-  def addParameter(key: String, value: String) = unterlyingRequestBuilder.addHeader(key, value)
+      def onHeadersReceived(headers: HttpResponseHeaders)  = handler.onHeadersReceived(headers)
+    })
+    result
+  }
 
-  def addQueryParameter(name: String, value: String) = unterlyingRequestBuilder.addQueryParameter(name, value)
+  def addBodyPart(part: Part) = {
+    unterlyingRequestBuilder.addBodyPart(part)
+    this
+  }
+
+  def addCookie(cookie: Cookie) = {
+    unterlyingRequestBuilder.addCookie(cookie)
+    this
+  }
+
+  def addHeader(name: String, value: String) = {
+    unterlyingRequestBuilder.addHeader(name, value)
+    this
+  }
+
+  def addParameter(key: String, value: String) = {
+    unterlyingRequestBuilder.addHeader(key, value)
+    this
+  }
+
+  def addQueryParameter(name: String, value: String) = {
+    unterlyingRequestBuilder.addQueryParameter(name, value)
+    this
+  }
 
 
-  def setBody(data: Array[Byte]) = unterlyingRequestBuilder.setBody(data)
+  def setBody(data: Array[Byte]) = {
+    unterlyingRequestBuilder.setBody(data)
+    this
+  }
 
-  def setBody(data: ByteString) = unterlyingRequestBuilder.setBody(data.toArray)
+  def setBody(data: ByteString) = {
+    unterlyingRequestBuilder.setBody(data.toArray)
+    this
+  }
 
 
-  def setBody(data: String): AsyncHttpClient#BoundRequestBuilder = unterlyingRequestBuilder.setBody(data)
+  def setBody(data: String) = {
+    unterlyingRequestBuilder.setBody(data)
+    this
+  }
 
 
-  def setHeader(name: String, value: String) = unterlyingRequestBuilder.setHeader(name, value)
+  def setHeader(name: String, value: String) = {
+    unterlyingRequestBuilder.setHeader(name, value)
+    this
+  }
 
 
 }
