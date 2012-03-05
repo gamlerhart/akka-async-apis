@@ -27,18 +27,26 @@ class WebClient(private val context:ExecutionContext,
                  ) extends Extension {
 
 
-  def prepareGet(url: String): RequestBuilder = {
+  def prepareGet(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.prepareGet(url)
-    new RequestBuilder(f,context)
+    new WebRequestBuilder(f,context)
   }
-  def preparePost(url: String): RequestBuilder = {
+  def preparePost(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.preparePost(url)
-    new RequestBuilder(f,context)
+    new WebRequestBuilder(f,context)
+  }
+  def preparePut(url: String): WebRequestBuilder = {
+    val f = asyncHttpClient.preparePut(url)
+    new WebRequestBuilder(f,context)
+  }
+  def prepareDelete(url: String): WebRequestBuilder = {
+    val f = asyncHttpClient.prepareDelete(url)
+    new WebRequestBuilder(f,context)
   }
 }
 
 
-class RequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#BoundRequestBuilder,
+class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#BoundRequestBuilder,
                       private val context:ExecutionContext) {
   def execute():Future[Response] = {
     val result = Promise[Response]()(context)

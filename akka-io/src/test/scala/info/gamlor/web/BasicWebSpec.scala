@@ -4,12 +4,12 @@ import akka.testkit.TestKit
 import info.gamlor.io.TestActorSystem
 import org.scalatest.Spec
 import org.scalatest.matchers.MustMatchers
-import akka.dispatch.Await
 import akka.util.duration._
-import com.ning.http.client.{HttpResponseStatus, HttpResponseBodyPart, HttpResponseHeaders, AsyncHandler}
 import java.util.concurrent.atomic.AtomicBoolean
 import com.ning.http.client.AsyncHandler.STATE
 import java.util.concurrent.CancellationException
+import akka.dispatch.Await
+import com.ning.http.client._
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -17,6 +17,7 @@ import java.util.concurrent.CancellationException
  */
 
 class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with MustMatchers {
+
   describe("Web client IO") {
 
     it("can get stuff") {
@@ -30,15 +31,13 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
         })
     }
     it("can post stuff") {
-      TestWebServer.withTestServer(TestWebServer.EchoServer,
-        server => {
-          val future = WebClient(system).preparePost(server.url)
-            .setBody("This is the data we post").execute()
-
-          val result = Await.result(future, 5 seconds)
-
-          result.getResponseBody must not be ("This is the data we post")
-        })
+      roundTripWith(url=>WebClient(system).preparePost(url))
+    }
+    it("can put stuff") {
+      roundTripWith(url=>WebClient(system).preparePut(url))
+    }
+    it("can delete stuff") {
+      roundTripWith(url=>WebClient(system).prepareDelete(url))
     }
     it("has events") {
       TestWebServer.withTestServer(TestWebServer.EchoServer,
@@ -48,7 +47,8 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
           val onBodyPartReceivedCalled = new AtomicBoolean(false)
           val onHeadersReceivedCalled = new AtomicBoolean(false)
           val future = WebClient(system).preparePost(server.url)
-            .setBody("This is the data we post").execute(new AsyncHandler[String] {
+            .setBody("This is the data we post")
+            .execute(new AsyncHandler[String] {
             def onCompleted() = {
               onCompletedCalled.set(true)
               "final result"
@@ -84,7 +84,8 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
       TestWebServer.withTestServer(TestWebServer.EchoServer,
         server => {
           val result = WebClient(system).preparePost(server.url)
-            .setBody("This is the data we post").execute(new AsyncHandler[String] {
+            .setBody("This is the data we post")
+            .execute(new AsyncHandler[String] {
             def onCompleted() = {
               "final result"
             }
@@ -106,7 +107,7 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
 
           val content = Await.ready(result, 5 seconds)
           content.value.get.isLeft must be(true)
-          content.value.get.left.get.isInstanceOf[CancellationException] must be (true)
+          content.value.get.left.get.isInstanceOf[CancellationException] must be(true)
         })
 
     }
@@ -122,5 +123,16 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
         })
     }
 
+  }
+  private def roundTripWith(methodToUse:String => WebRequestBuilder) {
+    TestWebServer.withTestServer(TestWebServer.EchoServer,
+      server => {
+        val future = methodToUse(server.url)
+          .setBody("This is the data we post").execute()
+
+        val result = Await.result(future, 5 seconds)
+
+        result.getResponseBody must not be ("This is the data we post")
+      })
   }
 }
