@@ -31,7 +31,7 @@ object TestWebServer {
     addDefaultHeaders(response)
     val body = response.getPrintStream;
 
-    body.println("Hello World");
+    body.print("Hello World");
     body.close();
   }
 
@@ -40,7 +40,7 @@ object TestWebServer {
     addDefaultHeaders(response)
     val body = response.getPrintStream;
 
-    body.println(req.getContent);
+    body.print(req.getContent);
     body.close();
   }
   val VerySlowServer = (req: Request, response: Response) => {
@@ -48,8 +48,20 @@ object TestWebServer {
     Thread.sleep(7000)
     addDefaultHeaders(response)
     val body = response.getPrintStream;
-    body.println("Hello World");
+    body.print("Hello World");
     body.close();
+  }
+  val Redirect = (req: Request, response: Response, server:TestWebServer) => {
+
+    if(req.getAddress.getPath.getSegments.length==0){
+      response.setCode(302)
+      response.set("Location",server.url+"/some/other/location/")
+    } else{
+      addDefaultHeaders(response)
+      val body = response.getPrintStream;
+      body.print("Hello World");
+    }
+    response.close()
   }
   val FailCompletly = (req: Request, response: Response, server: TestWebServer) => {
     server.close()

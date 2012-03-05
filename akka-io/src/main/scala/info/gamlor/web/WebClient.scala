@@ -20,12 +20,19 @@ object WebClient
   with ExtensionIdProvider {
   override def lookup = this
 
-  override def createExtension(system: ExtendedActorSystem) = new WebClient(system.dispatcher)
+  override def createExtension(system: ExtendedActorSystem) = {
+    val builder = new AsyncHttpClientConfig.Builder();
+    builder.setFollowRedirects(true)
+    builder.setMaximumNumberOfRedirects(5)
+    val client = new WebClient(system.dispatcher,new AsyncHttpClient(builder.build()))
+    system.registerOnTermination(()=>client.asyncHttpClient.close())
+    client
+  }
 }
 
 
 class WebClient(private val context:ExecutionContext,
-                private val asyncHttpClient: AsyncHttpClient = new AsyncHttpClient()
+                val asyncHttpClient: AsyncHttpClient
                  ) extends Extension {
 
 

@@ -43,7 +43,7 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
 
           val result = Await.result(future, 5 seconds)
 
-          result.getResponseBody must not be ("Hello World")
+          result.getResponseBody must be ("Hello World")
         })
     }
     it("can timeout quickly") {
@@ -58,6 +58,17 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
           val content = Await.ready(future, 5 seconds)
           content.value.get.isLeft must be(true)
           content.value.get.left.get.isInstanceOf[TimeoutException] must be(true)
+        })
+    }
+    it("resolves redirects") {
+      TestWebServer.withTestServerExtended(TestWebServer.Redirect,
+        server => {
+          var future = WebClient(system).prepareGet(server.url).execute()
+
+          val result = Await.result(future, 500 seconds)
+
+
+          result.getResponseBody must be ("Hello World")
         })
     }
     it("has events") {
@@ -153,7 +164,7 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
 
         val result = Await.result(future, 5 seconds)
 
-        result.getResponseBody must not be ("This is the data we post")
+        result.getResponseBody must be ("This is the data we post")
       })
   }
   private def roundTripHeadersOnly(methodToUse:String => WebRequestBuilder) {
@@ -164,7 +175,7 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
 
         val result = Await.result(future, 5 seconds)
 
-        result.getResponseBody must not be ("Hello World")
+        result.getResponseBody must be ("Hello World")
       })
   }
 }
