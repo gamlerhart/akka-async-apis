@@ -21,7 +21,7 @@ object AkkaAsyncModules extends Build  {
       unmanagedBase <<= baseDirectory {
         base => base / "lib"
       },
-      libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, mockito)
+      libraryDependencies ++= Seq(akkaActors,httpLib, scalaTest, akkaTestKit, mockito,simpleTestServer)
     ))
 
   override lazy val settings = super.settings ++ buildSettings
@@ -47,5 +47,9 @@ object Dependencies {
   val akkaTestKit = "com.typesafe.akka" % "akka-testkit" % "2.0-RC3" % "test"
   val akkaActors = "com.typesafe.akka" % "akka-actor" % "2.0-RC3"
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
+
+  val httpLib = "com.ning" %"async-http-client"% "1.7.0"
+
+  val simpleTestServer = "org.simpleframework" % "simple" % "4.1.21"  % "test"
 
 }
