@@ -8,7 +8,7 @@ import java.util.concurrent.{Callable, TimeUnit}
  * @since 01.03.12
  */
 
-class DelegateToContext(private val context:ExecutionContext) extends ExecutionContextExecutorService{
+private[io] class DelegateToContext(private val context:ExecutionContext) extends ExecutionContextExecutorService{
   def reportFailure(t: Throwable) {
     context.reportFailure(t)
 
