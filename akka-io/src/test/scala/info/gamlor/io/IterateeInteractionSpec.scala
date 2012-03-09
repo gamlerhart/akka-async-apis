@@ -12,6 +12,8 @@ import akka.actor.IO.Done
  */
 
 class IterateeInteractionSpec extends SpecBase {
+  val WordsIntTestFile =2000
+  val WordsToStopWordIncluding =6
 
 
   describe("FileIO and Iteratees") {
@@ -32,9 +34,9 @@ class IterateeInteractionSpec extends SpecBase {
       val allContentFuture = file.readUntilDone(separatedBySpace);
 
       val content = Await.result(allContentFuture, 5 seconds)
-      content.size must be(2000)
+      content.size must be(WordsIntTestFile)
       content(0) must be("StartWord")
-      content(2000-1) must be("FinalWord")
+      content(WordsIntTestFile-1) must be("FinalWord")
 
       file.close()
 
@@ -45,12 +47,35 @@ class IterateeInteractionSpec extends SpecBase {
       val allContentFuture = file.readUntilDone(separatedBySpaceWithStopWord);
 
       val content = Await.result(allContentFuture, 5 seconds)
-      content.size must be(6)
+      content.size must be(WordsToStopWordIncluding)
       content(0) must be("StartWord")
-      content(6-1) must be("StopWord")
+      content(WordsToStopWordIncluding-1) must be("StopWord")
 
       file.close()
+    }
+    it("can start somewhere in the file") {
+      val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
 
+      val allContentFuture = file.readUntilDone(separatedBySpace,230,file.size());
+
+      val content = Await.result(allContentFuture, 5 seconds)
+      content.size must be(WordsIntTestFile-WordsToStopWordIncluding+1)
+      content(0) must be("StopWord")
+      content.last must be("FinalWord")
+
+      file.close()
+    }
+    it("can read section") {
+      val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
+
+      val allContentFuture = file.readUntilDone(separatedBySpace,230,8);
+
+      val content = Await.result(allContentFuture, 5 seconds)
+      content.size must be(1)
+      content(0) must be("StopWord")
+      content.last must be("StopWord")
+
+      file.close()
     }
   }
 
