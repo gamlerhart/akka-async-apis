@@ -105,11 +105,6 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
       promiseToComplete
     }
 
-    private def finishWithEOF() {
-      parser(IO.EOF(None))
-      promiseToComplete.success(mutableItaree.value._1.get)
-    }
-
     def completed(result: java.lang.Integer, reader: ContinuesReader[A]) {
       assert(this == reader)
       try {
@@ -118,6 +113,7 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
         readBuffer.flip()
         if (result == reader.stepSize) {
           amountStillToRead = amountStillToRead - result
+          readPosition = readPosition + result
           readBuffer.limit(min(amountStillToRead, stepSize).toInt)
           if(amountStillToRead>0){
             channel.read(readBuffer, readPosition, this, this);
@@ -130,6 +126,11 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
       } catch {
         case e: Exception => promiseToComplete.failure(e)
       }
+    }
+
+    private def finishWithEOF() {
+      parser(IO.EOF(None))
+      promiseToComplete.success(mutableItaree.value._1.get)
     }
 
     def failed(exc: Throwable, reader: ContinuesReader[A]) {

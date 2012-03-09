@@ -33,7 +33,7 @@ class IterateeInteractionSpec extends SpecBase {
 
       val allContentFuture = file.readUntilDone(separatedBySpace);
 
-      val content = Await.result(allContentFuture, 5 seconds)
+      val content = Await.result(allContentFuture, 500 seconds)
       content.size must be(WordsIntTestFile)
       content(0) must be("StartWord")
       content(WordsIntTestFile-1) must be("FinalWord")
