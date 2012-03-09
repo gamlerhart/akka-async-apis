@@ -1,10 +1,7 @@
 package info.gamlor.io
 
-import org.scalatest.matchers.MustMatchers
-import org.scalatest.Spec
 import akka.dispatch.Await
 import akka.util.duration._
-import akka.testkit.TestKit
 import org.mockito.Mockito._
 import org.mockito.Matchers._
 import org.mockito.stubbing.Answer

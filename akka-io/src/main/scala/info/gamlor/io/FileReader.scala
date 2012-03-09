@@ -7,8 +7,9 @@ import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 import scala.math._
 import akka.actor.IO
-import akka.actor.IO.Iteratee
 import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
+import collection.mutable.Buffer
+import akka.actor.IO.{Iteratee, Input}
 
 
 /**
@@ -53,15 +54,12 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     promise
   }
 
-  def read[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A] = {
-    val bytesToRead = if (amountToRead == -1) {
-      channel.size()
-    } else {
-      amountToRead
-    }
-    val reader = new ContinuesReader(startPos, bytesToRead, parser)
-    reader.startReading()
-  }
+  def readAll[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
+  = readWithIteraree(Accumulators.parseWhole(parser), startPos, amountToRead)
+
+  def readSegments[A](segmentParser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[Seq[A]]
+  = readWithIteraree(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
+
 
   def write(startPostion: Long, dataToWrite: ByteString): Future[Unit] = {
     val buffer = dataToWrite.asByteBuffer
@@ -74,6 +72,17 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
 
 
   def close() = channel.close()
+
+
+  private def readWithIteraree[A](parser: Accumulator[A], startPos: Long = 0, amountToRead: Long = -1) = {
+    val bytesToRead = if (amountToRead == -1) {
+      channel.size()
+    } else {
+      amountToRead
+    }
+    val reader = new ContinuesReader(startPos, bytesToRead, parser)
+    reader.startReading()
+  }
 
   private def writeBuffer(writeBuffer: ByteBuffer, startPostion: Long): Promise[Unit] = {
     val promise = Promise[Unit]
@@ -89,14 +98,55 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     promise
   }
 
+
+  trait Accumulator[A] {
+    def apply(input: IO.Input)
+
+    def finishedValue(): A
+  }
+
+  object Accumulators {
+
+    def parseWhole[A](parser: Iteratee[A]) = new Accumulator[A] {
+      private val mutableItaree = IO.IterateeRef.sync(parser)
+
+      def apply(input: Input) = mutableItaree(input)
+
+      def finishedValue(): A = mutableItaree.value._1.get
+    }
+
+    def parseSegments[A](parser: Iteratee[A]) = new Accumulator[Seq[A]] {
+      private val buffer = Buffer[A]();
+      private var currentIteratee : Iteratee[A] = parser;
+
+      def apply(input: Input) {
+        if(input.isInstanceOf[IO.EOF]){
+          buffer.add(currentIteratee(input)._1.get);
+        } else{
+          var (parsedValue, rest) = currentIteratee(input)
+          while(parsedValue.isInstanceOf[IO.Done[A]]){
+            buffer.add(parsedValue.get)
+            var (newParsedValue, newRest) = parser(rest)
+            parsedValue = newParsedValue
+            rest = newRest
+          }
+          currentIteratee = parsedValue
+        }
+
+      }
+
+      def finishedValue(): Seq[A] = buffer.toSeq
+    }
+  }
+
+
   class ContinuesReader[A](private var readPosition: Long,
                            private var amountStillToRead: Long,
-                           private val parser: Iteratee[A]
+                           private val resultAccumulator: Accumulator[A]
                             ) extends CompletionHandler[java.lang.Integer, ContinuesReader[A]] {
     val stepSize = min(32 * 1024, amountStillToRead).toInt;
     private val readBuffer = ByteBuffer.allocate(stepSize)
     private val promiseToComplete: Promise[A] = Promise[A]()
-    private val mutableItaree = IO.IterateeRef.sync(parser)
 
     def startReading() = {
       readBuffer.limit(min(amountStillToRead, stepSize).toInt)
@@ -108,7 +158,8 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
       assert(this == reader)
       try {
         readBuffer.flip()
-        mutableItaree(IO.Chunk(ByteString(reader.readBuffer)))
+        val readBytes: ByteString = ByteString(reader.readBuffer)
+        resultAccumulator(IO.Chunk(readBytes))
         readBuffer.flip()
         if (result == reader.stepSize) {
           amountStillToRead = amountStillToRead - result
@@ -128,8 +179,8 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     }
 
     private def finishWithEOF() {
-      parser(IO.EOF(None))
-      promiseToComplete.success(mutableItaree.value._1.get)
+      resultAccumulator(IO.EOF(None))
+      promiseToComplete.success(resultAccumulator.finishedValue())
     }
 
     def failed(exc: Throwable, reader: ContinuesReader[A]) {

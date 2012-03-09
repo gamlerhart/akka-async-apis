@@ -1,8 +1,7 @@
 package info.gamlor.io
 
 import java.util.concurrent.Executors
-import akka.dispatch.{Await, ExecutionContext, Promise, Future}
-import akka.util.duration._
+import akka.dispatch.{ExecutionContext, Promise, Future}
 import util.continuations._
 
 
