@@ -6,9 +6,8 @@ import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
 import java.nio.file._
 import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
-import collection.mutable.ArrayBuffer
 import akka.actor.IO
-import akka.actor.IO.{Input, Iteratee}
+import akka.actor.IO.{IterateeRefAsync, Iteratee}
 
 
 /**
@@ -62,35 +61,27 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     writeBuffer(ByteBuffer.wrap(dataToWrite), startPostion)
   }
 
-  def readAll[A](parser: Iteratee[A]): Future[A] = {
+  def readUntilDone[A](parser: Iteratee[A]): Future[A] = {
     val stepSize = 32 * 1024;
     val readBuffer = ByteBuffer.allocate(stepSize)
-    val state = ReadState[A](0, stepSize)
-    val processor =
-      IO.repeat {
-        for {
-          parcedPiece ← parser
-        } yield {
-          state.resultBuffer.add(parcedPiece)
-          ()
-        }
-      }
+    val processor =parser
     val promise = Promise[A]
-    channel.read[ReadState[A]](readBuffer, 0, state,
-      new CompletionHandler[java.lang.Integer, ReadState[A]] {
-        def completed(result: java.lang.Integer, attachment: ReadState[A]) {
+    val mutableItaree = IO.IterateeRef.async(parser)
+    channel.read[IterateeRefAsync[A]](readBuffer, 0, mutableItaree,
+      new CompletionHandler[java.lang.Integer, IterateeRefAsync[A]] {
+        def completed(result: java.lang.Integer, attachment: IterateeRefAsync[A]) {
           readBuffer.flip()
-          processor(IO.Chunk(ByteString(readBuffer)))
+          mutableItaree(IO.Chunk(ByteString(readBuffer)))
           readBuffer.flip()
-          if(result==attachment.stepSize){
+          if(result==stepSize){
             throw new Error("Read next bit")
           } else{
-            //processor(IO.EOF(None))
+            processor(IO.EOF(None))
+            promise.completeWith(attachment.future.map(v=>v._1.get))
           }
-          Promise.successful(attachment.resultBuffer.toSeq)
         }
 
-        def failed(exc: Throwable, attachment: ReadState[A]) {
+        def failed(exc: Throwable, attachment: IterateeRefAsync[A]) {
           promise.failure(exc)
         }
       })
@@ -112,10 +103,5 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     })
     promise
   }
-
-
-  case class ReadState[A](position: Long,
-                          stepSize: Long,
-                          resultBuffer: scala.collection.mutable.ArrayBuffer[A] = new ArrayBuffer[A]())
 
 }

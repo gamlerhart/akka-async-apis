@@ -44,8 +44,8 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "1.6.1" % "test"
 
-  val akkaTestKit = "com.typesafe.akka" % "akka-testkit" % "2.0-RC4" % "test"
-  val akkaActors = "com.typesafe.akka" % "akka-actor" % "2.0-RC4"
+  val akkaTestKit = "com.typesafe.akka" % "akka-testkit" % "2.0" % "test"
+  val akkaActors = "com.typesafe.akka" % "akka-actor" % "2.0"
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"
