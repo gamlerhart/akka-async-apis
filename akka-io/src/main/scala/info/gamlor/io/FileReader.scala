@@ -7,9 +7,8 @@ import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 import scala.math._
 import akka.actor.IO
-import akka.actor.IO.{IterateeRefSync, IterateeRefAsync, Iteratee}
+import akka.actor.IO.Iteratee
 import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
-import akka.util.ByteString._
 
 
 /**
@@ -54,6 +53,16 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     promise
   }
 
+  def read[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A] = {
+    val bytesToRead = if (amountToRead == -1) {
+      channel.size()
+    } else {
+      amountToRead
+    }
+    val reader = new ContinuesReader(startPos, bytesToRead, parser)
+    reader.startReading()
+  }
+
   def write(startPostion: Long, dataToWrite: ByteString): Future[Unit] = {
     val buffer = dataToWrite.asByteBuffer
     writeBuffer(buffer, startPostion)
@@ -63,16 +72,6 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     writeBuffer(ByteBuffer.wrap(dataToWrite), startPostion)
   }
 
-
-  def readUntilDone[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A] = {
-    val bytesToRead = if (amountToRead == -1) {
-      channel.size()
-    } else {
-      amountToRead
-    }
-    val reader = new ContinuesReader(startPos, bytesToRead, parser)
-    reader.startReading()
-  }
 
   def close() = channel.close()
 
@@ -115,9 +114,9 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
           amountStillToRead = amountStillToRead - result
           readPosition = readPosition + result
           readBuffer.limit(min(amountStillToRead, stepSize).toInt)
-          if(amountStillToRead>0){
+          if (amountStillToRead > 0) {
             channel.read(readBuffer, readPosition, this, this);
-          }else{
+          } else {
             finishWithEOF()
           }
         } else {

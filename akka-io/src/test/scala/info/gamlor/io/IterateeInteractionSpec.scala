@@ -20,7 +20,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("can read util EOF") {
       val file = FileReader.open(TestFiles.inTestFolder("multipleWords.txt").toString)
 
-      val allContentFuture = file.readUntilDone(separatedBySpace);
+      val allContentFuture = file.read(separatedBySpace);
 
       val content = Await.result(allContentFuture, 5 seconds)
       content must be(List("Hello", "everybody", "in", "this", "room"))
@@ -31,7 +31,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("can read accross buffer size") {
       val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
 
-      val allContentFuture = file.readUntilDone(separatedBySpace);
+      val allContentFuture = file.read(separatedBySpace);
 
       val content = Await.result(allContentFuture, 500 seconds)
       content.size must be(WordsIntTestFile)
@@ -44,7 +44,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("cancels processing when done") {
       val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
 
-      val allContentFuture = file.readUntilDone(separatedBySpaceWithStopWord);
+      val allContentFuture = file.read(separatedBySpaceWithStopWord);
 
       val content = Await.result(allContentFuture, 5 seconds)
       content.size must be(WordsToStopWordIncluding)
@@ -56,7 +56,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("can start somewhere in the file") {
       val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
 
-      val allContentFuture = file.readUntilDone(separatedBySpace,230,file.size());
+      val allContentFuture = file.read(separatedBySpace,230,file.size());
 
       val content = Await.result(allContentFuture, 5 seconds)
       content.size must be(WordsIntTestFile-WordsToStopWordIncluding+1)
@@ -68,7 +68,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("can read section") {
       val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
 
-      val allContentFuture = file.readUntilDone(separatedBySpace,230,8);
+      val allContentFuture = file.read(separatedBySpace,230,8);
 
       val content = Await.result(allContentFuture, 5 seconds)
       content.size must be(1)
