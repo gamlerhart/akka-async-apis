@@ -7,9 +7,9 @@ import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 import scala.math._
 import akka.actor.IO
-import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
 import collection.mutable.Buffer
 import akka.actor.IO.{Iteratee, Input}
+import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
 
 
 /**
@@ -36,7 +36,16 @@ object FileReader {
 class FileReader(val channel: AsynchronousFileChannel, private implicit val context: ExecutionContext) {
 
 
+  /**
+   * @see [[java.nio.channels.AsynchronousFileChannel#size]]
+   */
   def size() = channel.size()
+
+  /**
+   * @see [[java.nio.channels.AsynchronousFileChannel#force]]
+   */
+  def force(metaData:Boolean = true) = channel.force(metaData)
+
 
   def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
     val readBuffer = ByteBuffer.allocate(amountToRead)
