@@ -7,7 +7,7 @@ import java.nio.file._
 import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 import akka.actor.IO
-import akka.actor.IO.{IterateeRefAsync, Iteratee}
+import akka.actor.IO.{IterateeRefSync, IterateeRefAsync, Iteratee}
 
 
 /**
@@ -66,22 +66,29 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     val readBuffer = ByteBuffer.allocate(stepSize)
     val processor =parser
     val promise = Promise[A]
-    val mutableItaree = IO.IterateeRef.async(parser)
-    channel.read[IterateeRefAsync[A]](readBuffer, 0, mutableItaree,
-      new CompletionHandler[java.lang.Integer, IterateeRefAsync[A]] {
-        def completed(result: java.lang.Integer, attachment: IterateeRefAsync[A]) {
-          readBuffer.flip()
-          mutableItaree(IO.Chunk(ByteString(readBuffer)))
-          readBuffer.flip()
-          if(result==stepSize){
-            throw new Error("Read next bit")
-          } else{
-            processor(IO.EOF(None))
-            promise.completeWith(attachment.future.map(v=>v._1.get))
+    val mutableItaree = IO.IterateeRef.sync(parser)
+    channel.read[IterateeRefSync[A]](readBuffer, 0, mutableItaree,
+      new CompletionHandler[java.lang.Integer, IterateeRefSync[A]] {
+        private var readPosition = 0
+        def completed(result: java.lang.Integer, attachment: IterateeRefSync[A]) {
+          try {
+            readBuffer.flip()
+            mutableItaree(IO.Chunk(ByteString(readBuffer)))
+            readBuffer.flip()
+            if(result==stepSize){
+              readPosition = readPosition + stepSize
+              channel.read(readBuffer,readPosition,attachment,this);
+            } else{
+              processor(IO.EOF(None))
+              promise.success(attachment.value._1.get)
+            }
+
+          } catch {
+            case e:Exception => promise.failure(e)
           }
         }
 
-        def failed(exc: Throwable, attachment: IterateeRefAsync[A]) {
+        def failed(exc: Throwable, attachment: IterateeRefSync[A]) {
           promise.failure(exc)
         }
       })

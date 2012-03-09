@@ -18,7 +18,7 @@ class IterateeInteractionSpec extends SpecBase {
     it("can read util EOF") {
       val file = FileReader.open(TestFiles.inTestFolder("multipleWords.txt").toString)
 
-      val allContentFuture = file.readUntilDone(AllWords);
+      val allContentFuture = file.readUntilDone(separatedBySpace);
 
       val content = Await.result(allContentFuture, 5 seconds)
       content must be(List("Hello", "everybody", "in", "this", "room"))
@@ -27,6 +27,29 @@ class IterateeInteractionSpec extends SpecBase {
 
     }
     it("can read accross buffer size") {
+      val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
+
+      val allContentFuture = file.readUntilDone(separatedBySpace);
+
+      val content = Await.result(allContentFuture, 5 seconds)
+      content.size must be(2000)
+      content(0) must be("StartWord")
+      content(2000-1) must be("FinalWord")
+
+      file.close()
+
+    }
+    it("cancels processing when done") {
+      val file = FileReader.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
+
+      val allContentFuture = file.readUntilDone(separatedBySpaceWithStopWord);
+
+      val content = Await.result(allContentFuture, 5 seconds)
+      content.size must be(6)
+      content(0) must be("StartWord")
+      content(6-1) must be("StopWord")
+
+      file.close()
 
     }
   }
@@ -54,9 +77,23 @@ class IterateeInteractionSpec extends SpecBase {
     }
     step(Nil)
   }
+  def separatedBySpaceWithStopWord = {
+    def step(found: List[String]): IO.Iteratee[List[String]] = {
+      val oneWord = for {
+        word <- IO.takeUntil(Space)
+      } yield word.utf8String
 
-  private val AllWords = for {
-    allWords <- separatedBySpace
-  } yield allWords
+      oneWord.flatMap(s => {
+        if (s.isEmpty) {
+          Done(found)
+        }else if (s == "StopWord") {
+          Done(List(s).:::(found))
+        } else {
+          step(List(s).:::(found))
+        }
+      })
+    }
+    step(Nil)
+  }
 
 }
