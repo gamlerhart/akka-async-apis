@@ -47,6 +47,13 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
   def force(metaData:Boolean = true) = channel.force(metaData)
 
 
+  /**
+   * Reads a sequence of bytes from this file, starting at the given file position. It will allocate
+   * a buffer which can hold the requested data. Finally it returns the read data as a byte string.
+   * @param startPoint start point of the read, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read. A byte buffer of this size will be allocated.
+   * @return future which will complete with the read data or exception.
+   */
   def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
     val readBuffer = ByteBuffer.allocate(amountToRead)
     val promise = Promise[ByteString]
@@ -62,6 +69,7 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     })
     promise
   }
+
 
   def readAll[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
   = readWithIteraree(Accumulators.parseWhole(parser), startPos, amountToRead)
