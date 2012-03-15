@@ -98,17 +98,40 @@ class FileIO(val channel: AsynchronousFileChannel, private implicit val context:
   def readSegments[A](segmentParser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[Seq[A]]
   = readWithIteraree(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
 
-
+  /**
+   * Writes a sequence of bytes to this file, starting at the given file position.
+   *
+   * If the given position is greater than the file's size, at the time that the write is attempted,
+   * then the file will be grown to accommodate the new bytes;
+   * the values of any bytes between the previous end-of-file and the newly-written bytes are unspecified.
+   * @param startPostion The file position at which the transfer is to begin; must be non-negative
+   * @param dataToWrite Data to write
+   * @return Unit future which signals the completion or errors
+   */
   def write(startPostion: Long, dataToWrite: ByteString): Future[Unit] = {
     val buffer = dataToWrite.asByteBuffer
     writeBuffer(buffer, startPostion)
   }
-
+  /**
+     * Writes a sequence of bytes to this file, starting at the given file position.
+     *
+     * If the given position is greater than the file's size, at the time that the write is attempted,
+     * then the file will be grown to accommodate the new bytes;
+     * the values of any bytes between the previous end-of-file and the newly-written bytes are unspecified.
+     * @param startPostion The file position at which the transfer is to begin; must be non-negative
+     * @param dataToWrite Data to write
+     * @return Unit future which signals the completion or errors
+     */
   def write(startPostion: Long, dataToWrite: Array[Byte]): Future[Unit] = {
     writeBuffer(ByteBuffer.wrap(dataToWrite), startPostion)
   }
 
-
+  /**
+   * Closes this file and the underlying channel.
+   *
+   * Any outstanding asynchronous operations upon this channel will complete with the exception AsynchronousCloseException.
+   * After a channel is closed, further attempts to initiate asynchronous I/O operations complete immediately with cause ClosedChannelException.
+   */
   def close() = channel.close()
 
 
