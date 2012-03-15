@@ -6,10 +6,10 @@ import java.nio.file._
 import akka.dispatch.{Future, ExecutionContext, Promise}
 import scala.collection.JavaConversions._
 import scala.math._
-import akka.actor.IO
 import collection.mutable.Buffer
 import akka.actor.IO.{Iteratee, Input}
 import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
+import akka.actor.IO
 
 
 /**
@@ -17,23 +17,23 @@ import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
  * @since 01.03.12
  */
 
-object FileReader {
+object FileIO {
   private val defaultOpenOptions: java.util.Set[OpenOption] = java.util.Collections.singleton(StandardOpenOption.READ)
 
   def open(fileName: String)(implicit context: ExecutionContext) = {
     val fileChannel = AsynchronousFileChannel.open(Paths.get(fileName), defaultOpenOptions, new DelegateToContext(context))
-    new FileReader(fileChannel, context)
+    new FileIO(fileChannel, context)
   }
 
   def open(fileName: String, openOptions: OpenOption*)(implicit context: ExecutionContext) = {
     val fileChannel = AsynchronousFileChannel.open(Paths.get(fileName), openOptions.toSet, new DelegateToContext(context))
-    new FileReader(fileChannel, context)
+    new FileIO(fileChannel, context)
   }
 
 
 }
 
-class FileReader(val channel: AsynchronousFileChannel, private implicit val context: ExecutionContext) {
+class FileIO(val channel: AsynchronousFileChannel, private implicit val context: ExecutionContext) {
 
 
   /**
@@ -50,8 +50,8 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
   /**
    * Reads a sequence of bytes from this file, starting at the given file position. It will allocate
    * a buffer which can hold the requested data. Finally it returns the read data as a byte string.
-   * @param startPoint start point of the read, from 0. If the start point is outside the file size, a empty result is returned
-   * @param amountToRead the amount to read. A byte buffer of this size will be allocated.
+   * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
    * @return future which will complete with the read data or exception.
    */
   def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
@@ -70,10 +70,31 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     promise
   }
 
-
+  /**
+   * Reads a sequence of bytes and passes those bytes to the given iteratee.
+   * It will stop when the iteratee signals that it is done with [[akka.actor.IO.Done]] and then return the result of that iteraree.
+   * Or it will stop when the amount bytes to read is reached. It does not return the 'left' over bytes not processed by the iteraree.
+   *
+   * @param parser the iteratee which is used to process the incoming data
+   * @param startPos start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes.
+   * @tparam A the parsed result type
+   * @return future which will complete with the read data or exception.
+   */
   def readAll[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
   = readWithIteraree(Accumulators.parseWhole(parser), startPos, amountToRead)
 
+  /**
+   * Reads a sequence of bytes and passes those bytes to the given iteratee. Evertime the iteraree signals
+   * that it is finished that result is added to the result sequence. The the processing is started over with the left
+   * over bytes of the file. This allows to parse the same repeated structure of a file.
+   * The parsing stops when the end of the file or the read limit is reached.
+   * @param segmentParser the iteratee which is used to process the incoming data
+   * @param startPos start point of the read, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes.
+   * @tparam A the parsed result type
+   * @return future which will complete with the read data or exception.
+   */
   def readSegments[A](segmentParser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[Seq[A]]
   = readWithIteraree(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
 
@@ -117,7 +138,7 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
 
 
   trait Accumulator[A] {
-    def apply(input: IO.Input)
+    def apply(input: IO.Input):Boolean
 
     def finishedValue(): A
   }
@@ -127,7 +148,11 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
     def parseWhole[A](parser: Iteratee[A]) = new Accumulator[A] {
       private val mutableItaree = IO.IterateeRef.sync(parser)
 
-      def apply(input: Input) = mutableItaree(input)
+      def apply(input: Input):Boolean = {
+        mutableItaree(input)
+        val isDone = mutableItaree.value._1.isInstanceOf[IO.Done[A]]
+        return !isDone
+      }
 
       def finishedValue(): A = mutableItaree.value._1.get
     }
@@ -136,7 +161,7 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
       private val buffer = Buffer[A]();
       private var currentIteratee : Iteratee[A] = parser;
 
-      def apply(input: Input) {
+      def apply(input: Input):Boolean = {
         if(input.isInstanceOf[IO.EOF]){
           buffer.add(currentIteratee(input)._1.get);
         } else{
@@ -149,6 +174,7 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
           }
           currentIteratee = parsedValue
         }
+        true
 
       }
 
@@ -176,9 +202,9 @@ class FileReader(val channel: AsynchronousFileChannel, private implicit val cont
       try {
         readBuffer.flip()
         val readBytes: ByteString = ByteString(reader.readBuffer)
-        resultAccumulator(IO.Chunk(readBytes))
+        val continue = resultAccumulator(IO.Chunk(readBytes))
         readBuffer.flip()
-        if (result == reader.stepSize) {
+        if (result == reader.stepSize && continue) {
           amountStillToRead = amountStillToRead - result
           readPosition = readPosition + result
           readBuffer.limit(min(amountStillToRead, stepSize).toInt)

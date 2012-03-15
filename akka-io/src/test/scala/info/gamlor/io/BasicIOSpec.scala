@@ -22,7 +22,7 @@ class BasicIOSpec extends SpecBase {
   describe("Basic IO") {
 
     it("allows to read a file") {
-      val file = FileReader.open(TestFiles.inTestFolder("helloWorld.txt").toString)
+      val file = FileIO.open(TestFiles.inTestFolder("helloWorld.txt").toString)
       val size = file.size()
       size must be (11)
 
@@ -34,7 +34,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write") {
-      val file = FileReader.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
         w <- file.write(0,ByteString("Hello World"))
@@ -47,7 +47,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("read from offset") {
-      val file = FileReader.open(TestFiles.inTestFolder("helloWorld.txt").toString)
+      val file = FileIO.open(TestFiles.inTestFolder("helloWorld.txt").toString)
 
       val allContentFuture = file.read(6,100);
 
@@ -57,7 +57,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("reads only available stuff") {
-      val file = FileReader.open(TestFiles.inTestFolder("helloWorld.txt").toString)
+      val file = FileIO.open(TestFiles.inTestFolder("helloWorld.txt").toString)
 
       val allContentFuture = file.read(0,256);
 
@@ -67,7 +67,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write bytes directly") {
-      val file = FileReader.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
         w <- file.write(0,"Hello World".getBytes("UTF8"))
@@ -80,7 +80,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write into a certain part") {
-      val file = FileReader.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
         w <- file.write(0,ByteString("Hello World"))
@@ -94,7 +94,7 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write into a certain part of empty file") {
-      val file = FileReader.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
         w <- file.write(12,ByteString("Hello World"))
@@ -145,7 +145,7 @@ class BasicIOSpec extends SpecBase {
         };
     when(failingChannel.read(anyObject(),anyObject(),anyObject(),anyObject())).thenAnswer(failingRequestMethod)
     when(failingChannel.write(anyObject(), anyObject(), anyObject(), anyObject())).thenAnswer(failingRequestMethod)
-    new FileReader(failingChannel, system.dispatcher)
+    new FileIO(failingChannel, system.dispatcher)
   }
 
 
