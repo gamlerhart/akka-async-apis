@@ -20,18 +20,33 @@ import akka.actor.IO
 object FileIO {
   private val defaultOpenOptions: java.util.Set[OpenOption] = java.util.Collections.singleton(StandardOpenOption.READ)
 
-  def open(fileName: String)(implicit context: ExecutionContext) = {
-    val fileChannel = AsynchronousFileChannel.open(Paths.get(fileName), defaultOpenOptions, new DelegateToContext(context))
+  def open(fileName: Path)(implicit context: ExecutionContext) = {
+    val fileChannel = AsynchronousFileChannel.open(fileName, defaultOpenOptions, new DelegateToContext(context))
     new FileIO(fileChannel, context)
   }
-
-  def open(fileName: String, openOptions: OpenOption*)(implicit context: ExecutionContext) = {
-    val fileChannel = AsynchronousFileChannel.open(Paths.get(fileName), openOptions.toSet, new DelegateToContext(context))
+  def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext) = {
+    val fileChannel = AsynchronousFileChannel.open(fileName, openOptions.toSet,
+      new DelegateToContext(context))
     new FileIO(fileChannel, context)
+  }
+  def open(fileName: String)(implicit context: ExecutionContext) :FileIO = {
+    open(Paths.get(fileName))
+  }
+
+  def open(fileName: String, openOptions: OpenOption*)(implicit context: ExecutionContext) :FileIO= {
+    open(Paths.get(fileName),openOptions:_*)
+  }
+
+  def openText(fileName: Path)(implicit context: ExecutionContext) = {
+    TextFileIO(open(fileName)(context))
+  }
+  def openText(fileName: String)(implicit context: ExecutionContext) = {
+    TextFileIO(open(fileName)(context))
   }
 
 
 }
+
 
 class FileIO(val channel: AsynchronousFileChannel, private implicit val context: ExecutionContext) {
 
@@ -48,26 +63,13 @@ class FileIO(val channel: AsynchronousFileChannel, private implicit val context:
 
 
   /**
-   * Reads a sequence of bytes from this file, starting at the given file position. It will allocate
-   * a buffer which can hold the requested data. Finally it returns the read data as a byte string.
+   * Reads a sequence of bytes from this file, starting at the given file position. Finally it returns the read data as a byte string.
    * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
    * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
    * @return future which will complete with the read data or exception.
    */
   def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
-    val readBuffer = ByteBuffer.allocate(amountToRead)
-    val promise = Promise[ByteString]
-    channel.read[Any](readBuffer, startPoint, null, new CompletionHandler[java.lang.Integer, Any] {
-      def completed(result: java.lang.Integer, attachment: Any) {
-        readBuffer.flip()
-        promise.success(ByteString(readBuffer))
-      }
-
-      def failed(exc: Throwable, attachment: Any) {
-        promise.failure(exc)
-      }
-    })
-    promise
+    readWithIteraree(Accumulators.byteStringBuilder(),startPoint,amountToRead)
   }
 
   /**
@@ -178,6 +180,21 @@ class FileIO(val channel: AsynchronousFileChannel, private implicit val context:
       }
 
       def finishedValue(): A = mutableItaree.value._1.get
+    }
+    def byteStringBuilder() = new Accumulator[ByteString] {
+      private val builder = ByteString.newBuilder
+
+      def apply(input: Input):Boolean = {
+        input match{
+          case IO.Chunk(bytes)=>{
+            builder ++=bytes
+          }
+          case _ =>{}
+        }
+        true
+      }
+
+      def finishedValue() = builder.result()
     }
 
     def parseSegments[A](parser: Iteratee[A]) = new Accumulator[Seq[A]] {

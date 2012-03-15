@@ -33,6 +33,18 @@ class BasicIOSpec extends SpecBase {
 
       file.close()
     }
+    it("can read bigger file") {
+      val file = FileIO.open(TestFiles.inTestFolder("largerTestFile.txt").toString)
+      val size = file.size()
+      size must be (109847)
+
+      val allContentFuture = file.read(0,size.toInt);
+
+      val content = Await.result(allContentFuture, 5 seconds)
+      content.size must be (109847)
+
+      file.close()
+    }
     it("can write") {
       val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
