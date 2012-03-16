@@ -3,12 +3,11 @@ package info.gamlor.io
 import akka.util.ByteString
 import java.nio.ByteBuffer
 import java.nio.file._
-import akka.dispatch.{Future, ExecutionContext, Promise}
+import akka.dispatch.{Future, ExecutionContext}
 import scala.collection.JavaConversions._
-import scala.math._
 import collection.mutable.Buffer
 import akka.actor.IO.{Iteratee, Input}
-import java.nio.channels.{AsynchronousFileChannel, CompletionHandler}
+import java.nio.channels.AsynchronousFileChannel
 import akka.actor.IO
 
 
@@ -85,9 +84,14 @@ object FileIO {
   }
 
 
-  def withFile[A](fileName: Path, openOptions: OpenOption*)(toRun: FileChannelIO => A)(implicit context: ExecutionContext): A = {
+  def withFile[A](fileName: Path, openOptions: OpenOption*)(toRun: FileIO => A)(implicit context: ExecutionContext): A = {
     val fileChannel = open(fileName, openOptions.toSet, context)
-    toRun(fileChannel)
+    val closedContext = new CloseChannelGroup(fileChannel);
+    try{
+      toRun(closedContext)
+    } finally {
+      closedContext.close()
+    }
   }
 
   private def open(fileName: Path, openOptions: java.util.Set[OpenOption], context: ExecutionContext): FileChannelIO = {
@@ -116,9 +120,7 @@ trait FileIO {
    * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
    * @return future which will complete with the read data or exception.
    */
-  def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
-    readAndAccumulate(Accumulators.byteStringBuilder(), startPoint, amountToRead)
-  }
+  def read(startPoint: Long, amountToRead: Int): Future[ByteString];
 
   /**
    * Reads a sequence of bytes and passes those bytes to the given iteratee.
@@ -131,8 +133,7 @@ trait FileIO {
    * @tparam A the parsed result type
    * @return future which will complete with the read data or exception.
    */
-  def readAll[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
-  = readAndAccumulate(Accumulators.parseWhole(parser), startPos, amountToRead)
+  def readAll[A](parser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[A];
 
   /**
    * Reads a sequence of bytes and passes those bytes to the given iteratee. Evertime the iteraree signals
@@ -145,8 +146,7 @@ trait FileIO {
    * @tparam A the parsed result type
    * @return future which will complete with the read data or exception.
    */
-  def readSegments[A](segmentParser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[Seq[A]]
-  = readAndAccumulate(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
+  def readSegments[A](segmentParser: Iteratee[A], startPos: Long = 0, amountToRead: Long = -1): Future[Seq[A]];
 
   /**
    * Writes a sequence of bytes to this file, starting at the given file position.
@@ -191,13 +191,30 @@ trait FileIO {
    */
   def close()
 
+
+}
+
+trait AccumulationReadingBase extends FileIO{
+
+  override def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
+    readAndAccumulate(Accumulators.byteStringBuilder(), startPoint, amountToRead)
+  }
+
+
+  override def readAll[A](parser: Iteratee[A], startPos: Long, amountToRead: Long): Future[A]
+  = readAndAccumulate(Accumulators.parseWhole(parser), startPos, amountToRead)
+
+  override def readSegments[A](segmentParser: Iteratee[A], startPos: Long, amountToRead: Long): Future[Seq[A]]
+  = readAndAccumulate(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
+
+
   /**
    * Used by the default implementation of the read methods to read the file.
    *
    * The implementation has to read from the given position the given amount of bytes. Every chunk of
-   * data read then in passed to the accumulator by calling [[info.gamlor.io.FileIO.Accumulator# a p p l y]].
+   * data read then in passed to the accumulator by calling [[info.gamlor.io.AccumulationReadingBase.Accumulator#apply]].
    * If it return true it can continue to read the data. If false is returned, it can stop readion further.
-   * When reading has finished, [[info.gamlor.io.FileIO.Accumulator# f i n i s h e d V a l u e]] should be called. That
+   * When reading has finished, [[info.gamlor.io.AccumulationReadingBase.Accumulator#finishedValue]] should be called. That
    * result then is the result of the returned Future.
    *
    * The accumulator is a mutable instance, with no synchonisation. The implementation has to
@@ -279,99 +296,17 @@ trait FileIO {
 
 }
 
-class FileChannelIO(val channel: AsynchronousFileChannel,
-                    private implicit val context: ExecutionContext) extends FileIO {
 
-  /**
-   * @see [[java.nio.channels.AsynchronousFileChannel# s i z e]]
-   */
-  def size() = channel.size()
+/**
+ * Accumelates the read data during a read request.
+ * Therefore it is mutable. A acummolater is accessed by the completion handlers.
+ * It relies on the fact that not multiple requests are issued with the same accumulator
+ * @tparam A
+ */
+trait Accumulator[A] {
+  def apply(input: IO.Input): Boolean
 
-  /**
-   * @see [[java.nio.channels.AsynchronousFileChannel# f o r c e]]
-   */
-  def force(metaData: Boolean = true) = channel.force(metaData)
-
-
-  /**
-   * Closes this file and the underlying channel.
-   *
-   * Any outstanding asynchronous operations upon this channel will complete with the exception AsynchronousCloseException.
-   * After a channel is closed, further attempts to initiate asynchronous I/O operations complete immediately with cause ClosedChannelException.
-   */
-  def close() = channel.close()
-
-
-  def readAndAccumulate[A](parser: Accumulator[A], startPos: Long = 0, amountToRead: Long = -1) = {
-    val bytesToRead = if (amountToRead == -1) {
-      channel.size()
-    } else {
-      amountToRead
-    }
-    val reader = new ContinuesReader(startPos, bytesToRead, parser)
-    reader.startReading()
-  }
-
-  def write(writeBuffer: ByteBuffer, startPostion: Long): Future[Int] = {
-    val promise = Promise[Int]
-    channel.write(writeBuffer, startPostion, null, new CompletionHandler[java.lang.Integer, Any] {
-      def completed(result: java.lang.Integer, attachment: Any) {
-        promise.success(result)
-      }
-
-      def failed(exc: Throwable, attachment: Any) {
-        promise.failure(exc)
-      }
-    })
-    promise
-  }
-
-  class ContinuesReader[A](private var readPosition: Long,
-                           private var amountStillToRead: Long,
-                           private val resultAccumulator: Accumulator[A]
-                            ) extends CompletionHandler[java.lang.Integer, ContinuesReader[A]] {
-    val stepSize = min(32 * 1024, amountStillToRead).toInt;
-    private val readBuffer = ByteBuffer.allocate(stepSize)
-    private val promiseToComplete: Promise[A] = Promise[A]()
-
-    def startReading() = {
-      readBuffer.limit(min(amountStillToRead, stepSize).toInt)
-      channel.read(readBuffer, readPosition, this, this)
-      promiseToComplete
-    }
-
-    def completed(result: java.lang.Integer, reader: ContinuesReader[A]) {
-      assert(this == reader)
-      try {
-        readBuffer.flip()
-        val readBytes: ByteString = ByteString(reader.readBuffer)
-        val continue = resultAccumulator(IO.Chunk(readBytes))
-        readBuffer.flip()
-        if (result == reader.stepSize && continue) {
-          amountStillToRead = amountStillToRead - result
-          readPosition = readPosition + result
-          readBuffer.limit(min(amountStillToRead, stepSize).toInt)
-          if (amountStillToRead > 0) {
-            channel.read(readBuffer, readPosition, this, this);
-          } else {
-            finishWithEOF()
-          }
-        } else {
-          finishWithEOF()
-        }
-      } catch {
-        case e: Exception => promiseToComplete.failure(e)
-      }
-    }
-
-    private def finishWithEOF() {
-      resultAccumulator(IO.EOF(None))
-      promiseToComplete.success(resultAccumulator.finishedValue())
-    }
-
-    def failed(exc: Throwable, reader: ContinuesReader[A]) {
-      promiseToComplete.failure(exc)
-    }
-  }
-
+  def finishedValue(): A
 }
+
+
