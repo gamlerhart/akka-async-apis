@@ -56,7 +56,7 @@ class IterateeInteractionSpec extends SpecBase {
         }
       }))
 
-      val fileIO = new FileIO(interactionRecorder, system.dispatcher)
+      val fileIO = new FileChannelIO(interactionRecorder, system.dispatcher)
 
       val allContentFuture = fileIO.readAll(separatedBySpaceWithStopWord);
 

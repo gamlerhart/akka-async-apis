@@ -157,7 +157,7 @@ class BasicIOSpec extends SpecBase {
         };
     when(failingChannel.read(anyObject(),anyObject(),anyObject(),anyObject())).thenAnswer(failingRequestMethod)
     when(failingChannel.write(anyObject(), anyObject(), anyObject(), anyObject())).thenAnswer(failingRequestMethod)
-    new FileIO(failingChannel, system.dispatcher)
+    new FileChannelIO(failingChannel, system.dispatcher)
   }
 
 

@@ -1,10 +1,8 @@
 package info.gamlor.io
 
 import akka.dispatch.{ExecutionContext, Future}
-import java.nio.channels.AsynchronousFileChannel
-import java.nio.file.{Paths, Path}
+import java.nio.file.Path
 import java.io.IOException
-import akka.actor.IO
 import akka.util.ByteString
 
 /**
