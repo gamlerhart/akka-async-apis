@@ -10,6 +10,8 @@ import akka.dispatch.Await
 import com.ning.http.client._
 import info.gamlor.io.{TestFiles, TestActorSystem}
 import java.util.concurrent.{TimeoutException, CancellationException}
+import akka.actor.ActorSystem
+import com.typesafe.config.ConfigFactory
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -69,12 +71,15 @@ class BasicWebSpec extends TestKit(TestActorSystem.DefaultSystem) with Spec with
     it("resolves redirects") {
       TestWebServer.withTestServerExtended(TestWebServer.Redirect,
         server => {
-          var future = WebClient(system).prepareGet(server.url).execute()
+          val differentConfig = ActorSystem("testsystem",ConfigFactory.load("enableRedirects"))
+          var future = WebClient(differentConfig).prepareGet(server.url).execute()
 
           val result = Await.result(future, 500 seconds)
 
 
           result.getResponseBody must be ("Hello World")
+
+          differentConfig.shutdown()
         })
     }
     it("has events") {
