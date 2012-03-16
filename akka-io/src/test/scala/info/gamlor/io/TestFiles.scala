@@ -10,6 +10,7 @@ import java.io.File
  */
 
 object TestFiles {
+
   val TestDataLocation = Paths.get("./akka-io/testdata")
 
   def inTestFolder(fileName:String)=TestDataLocation.resolve(fileName)

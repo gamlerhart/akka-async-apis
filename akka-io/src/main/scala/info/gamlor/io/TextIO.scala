@@ -32,6 +32,14 @@ trait TextIO {
     fileIO().readSegments(parser)
   }
 
+  def appendToEnd(textToWrite: String): Future[Int] ={
+    val startPoint = fileIO().size()
+    val textAsBytes = ByteString(textToWrite,encoding)
+    fileIO().write(textAsBytes,startPoint)
+  }
+
+
+
   def encoding = "UTF-8"
 
 

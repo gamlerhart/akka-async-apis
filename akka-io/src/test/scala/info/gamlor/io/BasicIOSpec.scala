@@ -46,10 +46,10 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write") {
-      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile(),StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
-        w <- file.write(0,ByteString("Hello World"))
+        w <- file.write(ByteString("Hello World"),0)
         r <- file.read(0,file.size().toInt)
       } yield r
 
@@ -79,10 +79,10 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write bytes directly") {
-      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile(),StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
-        w <- file.write(0,"Hello World".getBytes("UTF8"))
+        w <- file.write("Hello World".getBytes("UTF8"),0)
         r <- file.read(0,file.size().toInt)
       } yield r
 
@@ -91,12 +91,22 @@ class BasicIOSpec extends SpecBase {
 
       file.close()
     }
+    it("write returns byte written") {
+      val file = FileIO.open(TestFiles.tempFile(),StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+
+      val f = file.write("Hello World".getBytes("UTF8"),0)
+
+      val content = Await.result(f, 5 seconds)
+      content must be (11)
+
+      file.close()
+    }
     it("can write into a certain part") {
-      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile(),StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
-        w <- file.write(0,ByteString("Hello World"))
-        w2 <- file.write(6,ByteString("Roman"))
+        w <- file.write(ByteString("Hello World"),0)
+        w2 <- file.write(ByteString("Roman"),6)
         r <- file.read(0,file.size().toInt)
       } yield r
 
@@ -106,10 +116,10 @@ class BasicIOSpec extends SpecBase {
       file.close()
     }
     it("can write into a certain part of empty file") {
-      val file = FileIO.open(TestFiles.tempFile().toString,StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
+      val file = FileIO.open(TestFiles.tempFile(),StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ)
 
       val writtenStuff = for {
-        w <- file.write(12,ByteString("Hello World"))
+        w <- file.write(ByteString("Hello World"),12)
         r <- file.read(0,file.size().toInt)
       } yield r
 
@@ -133,7 +143,7 @@ class BasicIOSpec extends SpecBase {
     it("reports exception on writes") {
       val file = failingChannel()
 
-      val allContentFuture = file.write(0,ByteString("Hello World"));
+      val allContentFuture = file.write(ByteString("Hello World"),0);
 
 
       val content = Await.ready(allContentFuture, 5 seconds)

@@ -24,24 +24,28 @@ object FileIO {
     val fileChannel = AsynchronousFileChannel.open(fileName, defaultOpenOptions, new DelegateToContext(context))
     new FileChannelIO(fileChannel, context)
   }
-  def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext) = {
-    val fileChannel = AsynchronousFileChannel.open(fileName, openOptions.toSet,
-      new DelegateToContext(context))
-    new FileChannelIO(fileChannel, context)
+
+  def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext)  :FileIO = {
+    open(fileName,openOptions.toSet, context)
   }
   def open(fileName: String)(implicit context: ExecutionContext) :FileIO = {
     open(Paths.get(fileName))
   }
 
-  def open(fileName: String, openOptions: OpenOption*)(implicit context: ExecutionContext) :FileIO= {
-    open(Paths.get(fileName),openOptions:_*)
-  }
-
-  def openText(fileName: Path, encoding:String="UTF-8")(implicit context: ExecutionContext) = {
-    TextFileIO(open(fileName)(context), encoding)
-  }
   def openText(fileName: String)(implicit context: ExecutionContext) = {
     TextFileIO(open(fileName)(context))
+  }
+
+  def openText(fileName: Path,
+               encoding:String="UTF-8",
+               openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))
+              (implicit context: ExecutionContext) = {
+    TextFileIO(open(fileName,openOptions.toSet,context), encoding)
+  }
+  private def open(fileName: Path,openOptions:java.util.Set[OpenOption], context: ExecutionContext): FileChannelIO = {
+    val fileChannel = AsynchronousFileChannel.open(fileName, openOptions,
+      new DelegateToContext(context))
+    new FileChannelIO(fileChannel, context)
   }
 
 
@@ -106,7 +110,7 @@ trait FileIO{
    * @param dataToWrite Data to write
    * @return Unit future which signals the completion or errors
    */
-  def write(startPostion: Long, dataToWrite: ByteString): Future[Unit] = {
+  def write(dataToWrite: ByteString,startPostion: Long): Future[Int] = {
     val buffer = dataToWrite.asByteBuffer
     write(buffer, startPostion)
   }
@@ -120,7 +124,7 @@ trait FileIO{
    * @param dataToWrite Data to write
    * @return Unit future which signals the completion or errors
    */
-  def write(startPostion: Long, dataToWrite: Array[Byte]): Future[Unit] = {
+  def write(dataToWrite: Array[Byte],startPostion: Long): Future[Int] = {
     write(ByteBuffer.wrap(dataToWrite), startPostion)
   }
 
@@ -128,7 +132,7 @@ trait FileIO{
   /**
    * @see [[java.nio.channels.AsynchronousFileChannel#write]]
    */
-  def write(writeBuffer: ByteBuffer, startPostion: Long): Future[Unit]
+  def write(writeBuffer: ByteBuffer, startPostion: Long): Future[Int]
 
   /**
    * Closes this file and the underlying channel.
@@ -257,11 +261,11 @@ class FileChannelIO(val channel: AsynchronousFileChannel,
     reader.startReading()
   }
 
-  def write(writeBuffer: ByteBuffer, startPostion: Long): Promise[Unit] = {
-    val promise = Promise[Unit]
+  def write(writeBuffer: ByteBuffer, startPostion: Long): Future[Int] = {
+    val promise = Promise[Int]
     channel.write(writeBuffer, startPostion, null, new CompletionHandler[java.lang.Integer, Any] {
       def completed(result: java.lang.Integer, attachment: Any) {
-        promise.success()
+        promise.success(result)
       }
 
       def failed(exc: Throwable, attachment: Any) {

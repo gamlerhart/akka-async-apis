@@ -2,6 +2,7 @@ package info.gamlor.io
 
 import akka.dispatch.{Await, Future}
 import akka.util.duration._
+import java.nio.file.StandardOpenOption._
 
 
 /**
@@ -10,7 +11,7 @@ import akka.util.duration._
  */
 
 class TextOperationsSpec extends SpecBase {
-  describe("Text IO") {
+  describe("Reading Text IO") {
 
     it("allows to read a file") {
       val txt = FileIO.openText(TestFiles.inTestFolder("helloWorld.txt"))
@@ -55,6 +56,36 @@ class TextOperationsSpec extends SpecBase {
       val content = Await.result(contentFuture, 5 seconds)
       content must be ("This is in UFT16")
     }
+  }
+
+  describe("Wrting Text IO") {
+
+    it("can write to a file") {
+      val txt = FileIO.openText(TestFiles.tempFile(), encoding="UTF-16", openOptions = Set(READ,WRITE))
+
+      val fileAfterWrite = for{
+        write <- txt.appendToEnd("Some new Data Here")
+        read <- txt.readWholeFile()
+      } yield read
+
+      val readText = Await.result(fileAfterWrite,5 seconds)
+
+      readText must be("Some new Data Here")
+    }
+    it("can append to a file") {
+      val txt = FileIO.openText(TestFiles.tempFile(), openOptions = Set(READ,WRITE))
+
+      val fileAfterWrite = for{
+        w1 <- txt.appendToEnd("Some new Data Here")
+        w2 <- txt.appendToEnd(" More Data")
+        read <- txt.readWholeFile()
+      } yield read
+
+      val readText = Await.result(fileAfterWrite,5 seconds)
+
+      readText must be("Some new Data Here More Data")
+    }
+
   }
 
 }
