@@ -34,6 +34,27 @@ class TextOperationsSpec extends SpecBase {
       val content = Await.result(contentFuture, 5 seconds)
       content must be (Seq("Line 1","Line 2","Line 3","Line 4"))
     }
+    it("can read with delemiter") {
+      val txt = FileIO.openText(TestFiles.inTestFolder("multipleWords.txt"))
+      val contentFuture = txt.readSplitBy(" ")
+
+      val content = Await.result(contentFuture, 5 seconds)
+      content must be (Seq("Hello","everybody","in","this","room"))
+    }
+    it("can read with multipe delemiters") {
+      val txt = FileIO.openText(TestFiles.inTestFolder("delimiters.txt"))
+      val contentFuture = txt.readSplitBy(" ",":",".","-")
+
+      val content = Await.result(contentFuture, 5 seconds)
+      content must be (Seq("this","is","split","with","different","tokens"))
+    }
+    it("can read with encoding") {
+      val txt = FileIO.openText(TestFiles.inTestFolder("utf16encoding.txt"), encoding="UTF-16")
+      val contentFuture: Future[String] = txt.readWholeFile()
+
+      val content = Await.result(contentFuture, 5 seconds)
+      content must be ("This is in UFT16")
+    }
   }
 
 }

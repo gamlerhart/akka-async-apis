@@ -37,8 +37,8 @@ object FileIO {
     open(Paths.get(fileName),openOptions:_*)
   }
 
-  def openText(fileName: Path)(implicit context: ExecutionContext) = {
-    TextFileIO(open(fileName)(context))
+  def openText(fileName: Path, encoding:String="UTF-8")(implicit context: ExecutionContext) = {
+    TextFileIO(open(fileName)(context), encoding)
   }
   def openText(fileName: String)(implicit context: ExecutionContext) = {
     TextFileIO(open(fileName)(context))
