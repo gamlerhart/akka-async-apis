@@ -20,29 +20,77 @@ import akka.actor.IO
 object FileIO {
   private val defaultOpenOptions: java.util.Set[OpenOption] = java.util.Collections.singleton(StandardOpenOption.READ)
 
+  /**
+   * Opens a the specified file for the given path.
+   *
+   * This file will be opened in read only mode
+   * @param fileName a valid path to a file
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
   def open(fileName: Path)(implicit context: ExecutionContext) = {
     val fileChannel = AsynchronousFileChannel.open(fileName, defaultOpenOptions, new DelegateToContext(context))
     new FileChannelIO(fileChannel, context)
   }
 
-  def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext)  :FileIO = {
-    open(fileName,openOptions.toSet, context)
-  }
-  def open(fileName: String)(implicit context: ExecutionContext) :FileIO = {
+  /**
+   * Opens a the specified file for the given path.
+   *
+   * @param fileName a valid path to a file
+   * @param openOptions the open options for the file. See [[java.nio.file.OpenOption]]
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
+  def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext): FileChannelIO
+  = open(fileName, openOptions.toSet, context)
+
+  /**
+   * Opens a the specified file for the given path.
+   *
+   * This file will be opened in read only mode
+   * @param fileName a valid path to a file
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
+  def open(fileName: String)(implicit context: ExecutionContext): FileIO = {
     open(Paths.get(fileName))
   }
 
+  /**
+   * Opens a the specified text-file for the given path.
+   *
+   * This file will be opened in read only mode. The encoding will be UTF8
+   * @param fileName a valid path to a file
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
   def openText(fileName: String)(implicit context: ExecutionContext) = {
     TextFileIO(open(fileName)(context))
   }
 
+  /**
+   * Opens a the specified text-file for the given path.
+   *
+   * @param fileName a valid path to a file
+   * @param encoding the text encoding for this file
+   * @param openOptions the open options for the file. See [[java.nio.file.OpenOption]]
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
   def openText(fileName: Path,
-               encoding:String="UTF-8",
+               encoding: String = "UTF-8",
                openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))
               (implicit context: ExecutionContext) = {
-    TextFileIO(open(fileName,openOptions.toSet,context), encoding)
+    TextFileIO(open(fileName, openOptions.toSet, context), encoding)
   }
-  private def open(fileName: Path,openOptions:java.util.Set[OpenOption], context: ExecutionContext): FileChannelIO = {
+
+
+  def withFile[A](fileName: Path, openOptions: OpenOption*)(toRun: FileChannelIO => A)(implicit context: ExecutionContext): A = {
+    val fileChannel = open(fileName, openOptions.toSet, context)
+    toRun(fileChannel)
+  }
+
+  private def open(fileName: Path, openOptions: java.util.Set[OpenOption], context: ExecutionContext): FileChannelIO = {
     val fileChannel = AsynchronousFileChannel.open(fileName, openOptions,
       new DelegateToContext(context))
     new FileChannelIO(fileChannel, context)
@@ -51,16 +99,16 @@ object FileIO {
 
 }
 
-trait FileIO{
+trait FileIO {
   /**
-   * @see [[java.nio.channels.AsynchronousFileChannel#size]]
+   * @see [[java.nio.channels.AsynchronousFileChannel# s i z e]]
    */
-  def size() : Long
+  def size(): Long
 
   /**
-   * @see [[java.nio.channels.AsynchronousFileChannel#force]]
+   * @see [[java.nio.channels.AsynchronousFileChannel# f o r c e]]
    */
-  def force(metaData:Boolean = true) : Unit
+  def force(metaData: Boolean = true): Unit
 
   /**
    * Reads a sequence of bytes from this file, starting at the given file position. Finally it returns the read data as a byte string.
@@ -69,7 +117,7 @@ trait FileIO{
    * @return future which will complete with the read data or exception.
    */
   def read(startPoint: Long, amountToRead: Int): Future[ByteString] = {
-    readAndAccumulate(Accumulators.byteStringBuilder(),startPoint,amountToRead)
+    readAndAccumulate(Accumulators.byteStringBuilder(), startPoint, amountToRead)
   }
 
   /**
@@ -110,10 +158,11 @@ trait FileIO{
    * @param dataToWrite Data to write
    * @return Unit future which signals the completion or errors
    */
-  def write(dataToWrite: ByteString,startPostion: Long): Future[Int] = {
+  def write(dataToWrite: ByteString, startPostion: Long): Future[Int] = {
     val buffer = dataToWrite.asByteBuffer
     write(buffer, startPostion)
   }
+
   /**
    * Writes a sequence of bytes to this file, starting at the given file position.
    *
@@ -124,13 +173,13 @@ trait FileIO{
    * @param dataToWrite Data to write
    * @return Unit future which signals the completion or errors
    */
-  def write(dataToWrite: Array[Byte],startPostion: Long): Future[Int] = {
+  def write(dataToWrite: Array[Byte], startPostion: Long): Future[Int] = {
     write(ByteBuffer.wrap(dataToWrite), startPostion)
   }
 
 
   /**
-   * @see [[java.nio.channels.AsynchronousFileChannel#write]]
+   * @see [[java.nio.channels.AsynchronousFileChannel# w r i t e]]
    */
   def write(writeBuffer: ByteBuffer, startPostion: Long): Future[Int]
 
@@ -146,9 +195,9 @@ trait FileIO{
    * Used by the default implementation of the read methods to read the file.
    *
    * The implementation has to read from the given position the given amount of bytes. Every chunk of
-   * data read then in passed to the accumulator by calling [[info.gamlor.io.FileIO.Accumulator#apply]].
+   * data read then in passed to the accumulator by calling [[info.gamlor.io.FileIO.Accumulator# a p p l y]].
    * If it return true it can continue to read the data. If false is returned, it can stop readion further.
-   * When reading has finished, [[info.gamlor.io.FileIO.Accumulator#finishedValue]] should be called. That
+   * When reading has finished, [[info.gamlor.io.FileIO.Accumulator# f i n i s h e d V a l u e]] should be called. That
    * result then is the result of the returned Future.
    *
    * The accumulator is a mutable instance, with no synchonisation. The implementation has to
@@ -159,7 +208,7 @@ trait FileIO{
    * @tparam A
    * @return
    */
-  protected def readAndAccumulate[A](accumulator:Accumulator[A],startPos: Long = 0, amountToRead: Long = -1) :Future[A]
+  protected def readAndAccumulate[A](accumulator: Accumulator[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
 
   /**
    * Accumelates the read data during a read request.
@@ -168,7 +217,7 @@ trait FileIO{
    * @tparam A
    */
   trait Accumulator[A] {
-    def apply(input: IO.Input):Boolean
+    def apply(input: IO.Input): Boolean
 
     def finishedValue(): A
   }
@@ -178,7 +227,7 @@ trait FileIO{
     def parseWhole[A](parser: Iteratee[A]) = new Accumulator[A] {
       private val mutableItaree = IO.IterateeRef.sync(parser)
 
-      def apply(input: Input):Boolean = {
+      def apply(input: Input): Boolean = {
         mutableItaree(input)
         val isDone = mutableItaree.value._1.isInstanceOf[IO.Done[A]]
         return !isDone
@@ -186,15 +235,16 @@ trait FileIO{
 
       def finishedValue(): A = mutableItaree.value._1.get
     }
+
     def byteStringBuilder() = new Accumulator[ByteString] {
       private val builder = ByteString.newBuilder
 
-      def apply(input: Input):Boolean = {
-        input match{
-          case IO.Chunk(bytes)=>{
-            builder ++=bytes
+      def apply(input: Input): Boolean = {
+        input match {
+          case IO.Chunk(bytes) => {
+            builder ++= bytes
           }
-          case _ =>{}
+          case _ => {}
         }
         true
       }
@@ -204,17 +254,17 @@ trait FileIO{
 
     def parseSegments[A](parser: Iteratee[A]) = new Accumulator[Seq[A]] {
       private val buffer = Buffer[A]();
-      private var currentIteratee : Iteratee[A] = parser;
+      private var currentIteratee: Iteratee[A] = parser;
 
-      def apply(input: Input):Boolean = {
-        if(input.isInstanceOf[IO.EOF]){
+      def apply(input: Input): Boolean = {
+        if (input.isInstanceOf[IO.EOF]) {
           buffer.add(currentIteratee(input)._1.get);
-        } else{
+        } else {
           var (parsedValue, rest) = currentIteratee(input)
-          while(parsedValue.isInstanceOf[IO.Done[A]]){
+          while (parsedValue.isInstanceOf[IO.Done[A]]) {
             buffer.add(parsedValue.get)
             var (newParsedValue, newRest) = parser(rest)
-           parsedValue = newParsedValue
+            parsedValue = newParsedValue
             rest = newRest
           }
           currentIteratee = parsedValue
@@ -226,20 +276,21 @@ trait FileIO{
       def finishedValue(): Seq[A] = buffer.toSeq
     }
   }
+
 }
 
 class FileChannelIO(val channel: AsynchronousFileChannel,
-                                     private implicit val context: ExecutionContext) extends FileIO {
+                    private implicit val context: ExecutionContext) extends FileIO {
 
   /**
-   * @see [[java.nio.channels.AsynchronousFileChannel#size]]
+   * @see [[java.nio.channels.AsynchronousFileChannel# s i z e]]
    */
   def size() = channel.size()
 
   /**
-   * @see [[java.nio.channels.AsynchronousFileChannel#force]]
+   * @see [[java.nio.channels.AsynchronousFileChannel# f o r c e]]
    */
-  def force(metaData:Boolean = true) = channel.force(metaData)
+  def force(metaData: Boolean = true) = channel.force(metaData)
 
 
   /**
