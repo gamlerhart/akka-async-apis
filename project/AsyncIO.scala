@@ -12,17 +12,22 @@ object AkkaAsyncModules extends Build  {
     scalaVersion := "2.9.1"
   )
 
-  lazy val root = Project("akka-async-modules", file(".")) aggregate(akkaExperiment)
+  lazy val root = Project("akka-async-modules", file(".")) aggregate(akkaIO, akkaWebClient)
 
-  lazy val akkaExperiment: Project = Project(
+  lazy val akkaIO: Project = Project(
     id = "akka-io",
     base = file("./akka-io"),
     settings = defaultSettings ++ Seq(
-      unmanagedBase <<= baseDirectory {
-        base => base / "lib"
-      },
-      libraryDependencies ++= Seq(akkaActors,httpLib, scalaTest, akkaTestKit, mockito,simpleTestServer)
+      libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, mockito)
     ))
+  lazy val akkaWebClient: Project = Project(
+    id = "akka-webclient",
+    base = file("./akka-webclient"),
+    settings = defaultSettings ++ Seq(
+      libraryDependencies ++= Seq(akkaActors,httpLib, scalaTest, akkaTestKit, mockito,simpleTestServer)
+    )) dependsOn (akkaIO)
+
+
 
   override lazy val settings = super.settings ++ buildSettings
 
