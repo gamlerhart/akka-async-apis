@@ -9,7 +9,8 @@ object AkkaAsyncModules extends Build  {
   lazy val buildSettings = Seq(
     organization := "info.gamlor.akkaasync",
     version := "1.0-SNAPSHOT",
-    scalaVersion := "2.9.1"
+    scalaVersion := "2.9.1",
+    publishTo := Some(Resolver.file("file",  new File( "C:\\Users\\Gamlor\\Develop\\gamlor-mvn\\snapshots" )) )
   )
 
   lazy val root = Project("akka-async-modules", file(".")) aggregate(akkaIO, akkaWebClient)
@@ -34,7 +35,6 @@ object AkkaAsyncModules extends Build  {
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
     resolvers += "Typesafe Repo" at "http://repo.typesafe.com/typesafe/releases/",
     resolvers += "Tools-Repo" at "http://scala-tools.org/repo-releases/",
-
     // compile options
     scalacOptions ++= Seq("-encoding", "UTF-8", "-deprecation", "-unchecked","-optimize"),
     javacOptions ++= Seq("-source", "1.7", "-target", "1.7", "-Xlint:deprecation"),
