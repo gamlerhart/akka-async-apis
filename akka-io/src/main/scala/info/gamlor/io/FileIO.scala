@@ -83,15 +83,46 @@ object FileIO {
     TextFileIO(open(fileName, openOptions.toSet, context), encoding)
   }
 
-
-  def withFile[A](fileName: Path, openOptions: OpenOption*)(toRun: FileIO => A)(implicit context: ExecutionContext): A = {
+  /**
+   * Opens the specified file and runs the code of the given closure. It will close the file
+   * when the future which the closure returns finishes.
+   *
+   * This is indended for doing multiple read operations and then close the file: for example:
+   * <pre>val data = FileIO.withFile(TestFiles.inTestFolder("helloWorld.txt")){
+        file=>{
+          for{
+            readALineOnce <-file.read(0,100)
+            readALineTwice <- file.read(0,100)
+            readSomethingElse <- file.read(500,100)
+          } yield readALineOnce.++(readALineTwice).++(readSomethingElse)
+        }
+      }</pre>
+   *
+   * @param fileName path the file
+   * @param openOptions the open options for the file. See [[java.nio.file.OpenOption]]
+   * @param toRun the closure to execute
+   * @param context context on which the IO completion operations are executed
+   * @tparam A type of the result
+   * @return the future which the closure produced
+   */
+  def withFile[A](fileName: Path, openOptions: OpenOption*)(toRun: FileIO => Future[A])
+                 (implicit context: ExecutionContext): Future[A] = {
     val fileChannel = open(fileName, openOptions.toSet, context)
-    val closedContext = new CloseChannelGroup(fileChannel);
-    try{
-      toRun(closedContext)
-    } finally {
-      closedContext.close()
-    }
+    toRun(fileChannel).onComplete(_=>{
+      fileChannel.close()
+    })
+  }
+
+
+  def withTextFile[A](fileName: Path,
+               encoding: String = "UTF-8",
+               openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))
+              (toRun: TextFileIO => Future[A])
+              (implicit context: ExecutionContext) = {
+    val textChannel = openText(fileName,encoding, openOptions)(context)
+    toRun(textChannel).onComplete(_=>{
+      textChannel.close()
+    })
   }
 
   private def open(fileName: Path, openOptions: java.util.Set[OpenOption], context: ExecutionContext): FileChannelIO = {

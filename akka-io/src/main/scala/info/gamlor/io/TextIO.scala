@@ -38,6 +38,7 @@ trait TextIO {
     fileIO().write(textAsBytes,startPoint)
   }
 
+  def close() = fileIO().close()
 
 
   def encoding = "UTF-8"
@@ -67,8 +68,8 @@ object TextFileIO {
   = FileIO.openText(fileName)(context)
 
 
-  class TextFileIO(val fileIO: FileIO, override val encoding:String = "UTF-8") extends TextIO {
 
-  }
+}
+class TextFileIO(val fileIO: FileIO, override val encoding:String = "UTF-8") extends TextIO {
 
 }
