@@ -9,6 +9,11 @@ import java.util.concurrent.{Callable, TimeUnit}
  */
 
 private[io] class DelegateToContext(private val context:ExecutionContext) extends ExecutionContextExecutorService{
+
+  if(null==context){
+    throw new IllegalArgumentException("A execution context is required")
+  }
+
   def reportFailure(t: Throwable) {
     context.reportFailure(t)
 
