@@ -96,7 +96,7 @@ class BasicIOSpec extends SpecBase {
 
       val mutableReference = new AtomicReference[ByteString](ByteString.empty)
       val done = Promise[ByteString]()
-      val allContentFuture = file.readChunked[ByteString](0, size.toInt){
+      val allContentFuture = file.readChunked[ByteString](0, size){
           case IO.Chunk(newBytes) => {
             mutableReference.set(mutableReference.get.++(newBytes))
             mutableReference.get

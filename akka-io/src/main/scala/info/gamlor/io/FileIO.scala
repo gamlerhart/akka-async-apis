@@ -169,26 +169,33 @@ trait FileIO {
    *
    * The result of a future is always passed to the next invoked function. This way a function easily can accumulate the result.
    * The value which is passed on the first call needs to be set.
+   *
    * In case the function relies on side effects: The function is called on different threads, but never in parallel.
+   *
+   * The [[akka.actor.IO.Input]] is intended to be pattern matched. The [[akka.actor.IO.Chunk]] contains the data, the
+   * the [[akka.actor.IO.EOF]] signals the end of the read process
    * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
    * @param amountToRead the amount to read in bytes.
    * @param initialValue the value which is passed the first time the function is invoked.
    * @param accumulationClosure the function which processes the data
    * @return future which will complete with the read data or exception.
    */
-  def readChunked[A](startPoint: Long, amountToRead: Int, initialValue:A)(accumulationClosure: (A,IO.Input)=>A): Future[A];
+  def readChunked[A](startPoint: Long, amountToRead: Long, initialValue:A)(accumulationClosure: (A,IO.Input)=>A): Future[A];
 
   /**
    * Reads this file and passes the read blocks to the given function. When the read process finishes the result of the function
    * is returned in the future.
    *
    * The function is called on different threads, but never in parallel.
+   *
+   * The [[akka.actor.IO.Input]] is intended to be pattern matched. The [[akka.actor.IO.Chunk]] contains the data, the
+   * the [[akka.actor.IO.EOF]] signals the end of the read process
    * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
    * @param amountToRead the amount to read in bytes.
    * @param processingFunction the function which processes the data chunks
    * @return future which will complete with the read data or exception.
    */
-  def readChunked[A](startPoint: Long, amountToRead: Int)(processingFunction: PartialFunction[IO.Input, A]): Future[A];
+  def readChunked[A](startPoint: Long, amountToRead: Long)(processingFunction: PartialFunction[IO.Input, A]): Future[A];
 
   /**
    * Reads a sequence of bytes and passes those bytes to the given iteratee.
@@ -275,11 +282,11 @@ trait AccumulationReadingBase extends FileIO{
   override def readSegments[A](segmentParser: Iteratee[A], startPos: Long, amountToRead: Long): Future[Seq[A]]
   = readAndAccumulate(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
 
-  def readChunked[A](startPoint: Long, amountToRead: Int, initialValue: A)(accumulationClosure: (A, Input) => A)
+  def readChunked[A](startPoint: Long, amountToRead: Long, initialValue: A)(accumulationClosure: (A, Input) => A)
   = readAndAccumulate(Accumulators.functionAccumulator(initialValue,accumulationClosure),startPoint,amountToRead)
 
 
-  def readChunked[A](startPoint: Long, amountToRead: Int)(processingFunction: PartialFunction[Input, A]): Future[A] ={
+  def readChunked[A](startPoint: Long, amountToRead: Long)(processingFunction: PartialFunction[Input, A]): Future[A] ={
     readChunked[A](startPoint,amountToRead,null.asInstanceOf[A])((previousValue:A,data:IO.Input)=>
       if(processingFunction.isDefinedAt(data)){
         processingFunction(data)

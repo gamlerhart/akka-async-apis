@@ -3,8 +3,8 @@ package info.gamlor.io
 import akka.util.{Duration, ByteString}
 import java.util.concurrent.TimeUnit
 import java.nio.file.{StandardOpenOption, OpenOption, Path}
-import akka.actor.{Props, Actor, ActorRefFactory, ActorRef}
 import akka.dispatch.ExecutionContext
+import akka.actor._
 
 
 /**
@@ -85,6 +85,31 @@ object IOActors {
 
 
 
+  /**
+   * Reads a sequence of bytes from this file, starting at the given file position. Instead of returning
+   * all the requested data the data will be delivered in blocks, by sending back. This is especially usefull
+   * when you don't want to keep the whole file in memory.
+   *
+   * Finally it returns the read data as a byte string.
+   *
+   * On a successful read the response is delivered as a [[info.gamlor.io.IOActors.ReadResponse]] message.
+   * In case of a failure the IOActor crashes and the Akka failure handling kicks in. So this actor is intended to be supervised
+   * @param startPoint start point of the read operation, from 0, in bytes. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
+   * @param identification a optional identification value for this request. Will be a part of all resulting [[info.gamlor.io.IOActors.ReadChunk]]
+   * @return future which will complete with the read data or exception.
+   */
+  case class ReadInChunks(startPoint: Long, amountToRead: Long, identification:Any = null)
+
+  /**
+   * A part of the result from a [[info.gamlor.io.IOActors.ReadInChunks]] request. Mutliple
+   * read chunks will be returned to the sender, until the read process is done.
+   *
+   *
+   * @param data data in a [[akka.actor.IO.Chunk]] or [[akka.actor.IO.EOF]] when finished
+   * @param identification the identification token passed to the [[info.gamlor.io.IOActors.ReadInChunks]]
+   */
+  case class ReadChunk(data:IO.Input,identification:Any = null)
 
 }
 
@@ -114,6 +139,17 @@ class IOActor(private val fileHandleFactory:ExecutionContext=>FileIO,
       }.onFailure {
         case ex: Exception => currentSelf ! ExceptionOccured(ex)
 
+      }
+    }
+    case ReadInChunks(start, amount, identifier) => {
+      inUsed()
+      val file = fileChannel()
+      val currentSender = sender
+      val currentSelf = self
+      file.readChunked[Unit](start, amount){
+        case c:IO.Input => currentSender ! ReadChunk(c,identifier)
+      }.onFailure {
+        case ex: Exception => currentSelf ! ExceptionOccured(ex)
       }
     }
     case Write(data, startPos) => {

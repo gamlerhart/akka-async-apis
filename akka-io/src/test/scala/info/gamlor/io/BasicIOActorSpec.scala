@@ -1,15 +1,15 @@
 package info.gamlor.io
 
 import akka.pattern._
-import info.gamlor.io.IOActors._
 import akka.dispatch.Await
 import akka.util.duration._
-import akka.testkit.TestActorRef
 import java.io.IOException
 import akka.actor._
 import java.util.concurrent.{TimeUnit, CountDownLatch}
 import java.nio.file.StandardOpenOption
 import akka.util.{ByteString, Timeout}
+import info.gamlor.io.IOActors._
+import akka.testkit.{TestProbe, TestActorRef}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -38,12 +38,42 @@ class BasicIOActorSpec extends SpecBase {
       content.amountToRead must be(11)
 
     }
+    it("can read chunked") {
+      val fileActor = IOActors.createForFile(TestFiles.inTestFolder("largerTestFile.txt"))
+
+      val receiver = TestProbe()
+
+      fileActor.!(ReadInChunks(0, Int.MaxValue, "test-request"))(receiver.ref)
+
+      val msg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
+
+      msg.identification must be("test-request")
+      msg.data.isInstanceOf[IO.Chunk] must be(true)
+
+
+    }
+    it("can read chunked small ifle") {
+      val fileActor = IOActors.createForFile(TestFiles.inTestFolder("helloWorld.txt"))
+
+      val receiver = TestProbe()
+
+      fileActor.!(ReadInChunks(0, Int.MaxValue, "test-request"))(receiver.ref)
+
+      val dataMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
+      val eofMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
+
+      dataMsg.identification must be("test-request")
+      dataMsg.data.asInstanceOf[IO.Chunk].bytes.utf8String must be("Hello World")
+      eofMsg.data.isInstanceOf[IO.EOF] must be (true)
+
+
+    }
     it("can write") {
-      val fileActor = IOActors.createForFile(TestFiles.tempFile(),Set(StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ))
+      val fileActor = IOActors.createForFile(TestFiles.tempFile(), Set(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))
 
 
       val operations = for {
-        w <- fileActor ? Write(ByteString("Hello World"),0)
+        w <- fileActor ? Write(ByteString("Hello World"), 0)
         fileSize <- (fileActor ? FileSize).mapTo[FileSizeResponse]
         dataRead <- (fileActor ? Read(0, fileSize.size.toInt)).mapTo[ReadResponse]
       } yield dataRead
@@ -66,7 +96,7 @@ class BasicIOActorSpec extends SpecBase {
       smallSize should be < (largeSize)
     }
     it("closes resource after timeout") {
-      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx), Some(1 milliseconds)))
+      val testRef = TestActorRef(new IOActor(ctx => FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx), Some(1 milliseconds)))
 
       // send request to open channel
       val sizeRequest = (testRef ? FileSize)
@@ -80,12 +110,12 @@ class BasicIOActorSpec extends SpecBase {
     it("crashes on io issue") {
       val supervisor = TestActorRef(new TestSupervisor())
 
-      val failingFileSizeRequest = for{
+      val failingFileSizeRequest = for {
         fileHandlingActor <- (supervisor ? "non-existing-file.txt").mapTo[ActorRef]
         fileSize <- fileHandlingActor ? FileSize
       } yield fileSize
 
-      supervisor.underlyingActor.waitForFailure.await(1000,TimeUnit.SECONDS)
+      supervisor.underlyingActor.waitForFailure.await(1000, TimeUnit.SECONDS)
 
       supervisor.underlyingActor.ioExceptionCounter must be(1)
     }
@@ -93,19 +123,19 @@ class BasicIOActorSpec extends SpecBase {
       val supervisor = TestActorRef(new TestSupervisor())
 
       val failingChannel = FailingTestChannels.failingChannel(system.dispatcher)
-      val failingFileSizeRequest = for{
+      val failingFileSizeRequest = for {
         fileHandlingActor <- (supervisor ? failingChannel).mapTo[ActorRef]
-        fileSize <- fileHandlingActor ? Read(0,200)
+        fileSize <- fileHandlingActor ? Read(0, 200)
       } yield fileSize
 
-      supervisor.underlyingActor.waitForFailure.await(1000,TimeUnit.SECONDS)
+      supervisor.underlyingActor.waitForFailure.await(1000, TimeUnit.SECONDS)
 
       supervisor.underlyingActor.ioExceptionCounter must be(1)
     }
     it("can close channel") {
-      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx)))
+      val testRef = TestActorRef(new IOActor(ctx => FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx)))
 
-      val sizeAndClose = for{
+      val sizeAndClose = for {
         sizeRequest <- (testRef ? FileSize)
         close <- (testRef ? CloseChannel)
 
@@ -132,12 +162,13 @@ class BasicIOActorSpec extends SpecBase {
 
     protected def receive = {
       case fileName: String => sender ! IOActors.createForFile(TestFiles.inTestFolder(fileName))(context)
-      case channel: FileChannelIO => sender ! context.actorOf(Props(new IOActor(ctx=>channel)))
+      case channel: FileChannelIO => sender ! context.actorOf(Props(new IOActor(ctx => channel)))
       case CrashCount => sender ! ioExceptionCounter
     }
 
 
   }
+
   case object CrashCount
 
 }
