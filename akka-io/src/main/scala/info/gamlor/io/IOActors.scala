@@ -4,6 +4,7 @@ import akka.util.{Duration, ByteString}
 import java.util.concurrent.TimeUnit
 import java.nio.file.{StandardOpenOption, OpenOption, Path}
 import akka.actor.{Props, Actor, ActorRefFactory, ActorRef}
+import akka.dispatch.ExecutionContext
 
 
 /**
@@ -13,19 +14,33 @@ import akka.actor.{Props, Actor, ActorRefFactory, ActorRef}
 
 object IOActors {
 
+  /**
+   * Creates an actor which does asynchronous file operations for you
+   * @param fileName a valid path to a file
+   * @param autoCloseAfter timeout after which the file channel is closed when not used
+   * @param openOptions the open options for the file. See [[java.nio.file.OpenOption]]
+   * @param actorFactory the context to create new actors
+   * @return
+   */
   def createForFile(fileName: Path,
                     autoCloseAfter: Duration = Duration(5, TimeUnit.SECONDS),
                     openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))(implicit actorFactory: ActorRefFactory): ActorRef = {
-    actorFactory.actorOf(Props(new IOActor(fileName, autoCloseAfter, openOptions)))
+    actorFactory.actorOf(Props(new IOActor((ctx)=>FileIO.open(fileName,openOptions)(ctx), autoCloseAfter)))
   }
 
-  trait IOActorRequest
 
   /**
-   * Request the file length information. The file lenght will be reported back with [[info.gamlor.io.IOActors.FileSizeResponse]]
+   * Request the file length information. The file length will be reported back with [[info.gamlor.io.IOActors.FileSizeResponse]]
    *
    */
-  case object FileSize extends IOActorRequest
+  case object FileSize
+
+  /**
+   * Close the channel to the file. Note that any further operation reopens the channel.
+   *
+   * No response is sent back for this request.
+   */
+  case object CloseChannel
 
   /**
    * Reads a sequence of bytes from this file, starting at the given file position. Finally it returns the read data as a byte string.
@@ -36,24 +51,34 @@ object IOActors {
    * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
    * @return future which will complete with the read data or exception.
    */
-  case class Read(startPoint: Long, amountToRead: Int)  extends IOActorRequest
+  case class Read(startPoint: Long, amountToRead: Int)
 
+  /**
+   * Respons for [[info.gamlor.io.IOActors.FileSizeResponse]]
+   * @param size the size of the file
+   */
   case class FileSizeResponse(size: Long)
 
+  /**
+   * Response for [[info.gamlor.io.IOActors.Read]].
+   * @param data the read data
+   * @param startPoint the position from which this read occurred
+   * @param amountToRead the amount to read which was requested. The amount read is the data length.
+   */
   case class ReadResponse(data: ByteString, startPoint: Long, amountToRead: Int)
+
 
 
 
 }
 
-class IOActor(fileName: Path,
-              autoCloseAfter: Duration = Duration(5, TimeUnit.SECONDS),
-              openOptions: Set[OpenOption] = Set(StandardOpenOption.READ)) extends Actor {
+class IOActor(fileHandleFactory:ExecutionContext=>FileIO,
+              autoCloseAfter: Duration = Duration(5, TimeUnit.SECONDS)) extends Actor {
 
   import info.gamlor.io.IOActors._
 
   private implicit val executionContext = context.dispatcher
-  private var openChannel: Option[FileChannelIO] = None
+  private var openChannel: Option[FileIO] = None
   private var channelInUse = false
 
   protected def receive = {
@@ -66,11 +91,13 @@ class IOActor(fileName: Path,
       inUsed()
       val file = fileChannel()
       val currentSender = sender
+      val currentSelf = self
       file.read(start, amount).onSuccess {
         case bytes: ByteString => currentSender ! ReadResponse(bytes, start, amount)
-        case unexpected => self ! UnexpectedResult(unexpected)
+        case unexpected => currentSelf ! UnexpectedResult(unexpected)
       }.onFailure {
-        case ex: Exception => self ! ExceptionOccured(ex)
+        case ex: Exception => currentSelf ! ExceptionOccured(ex)
+
       }
     }
     case CheckIfIsInUse =>{
@@ -78,12 +105,14 @@ class IOActor(fileName: Path,
         channelInUse = false;
         context.system.scheduler.scheduleOnce(autoCloseAfter,self,CheckIfIsInUse)
       } else{
-        openChannel.foreach(c=>c.close())
-        openChannel = None
+        closeChannel()
       }
     }
+    case CloseChannel =>{
+      closeChannel()
+    }
     case ExceptionOccured(ex)=>throw ex
-    case UnexpectedResult(ex)=>throw new Error("Completly unexpected value within the actor"+ex)
+    case UnexpectedResult(result)=>throw new Error("Completly unexpected value within the actor"+result)
 
   }
 
@@ -91,7 +120,7 @@ class IOActor(fileName: Path,
     openChannel match{
       case Some(channel) => channel
       case None =>{
-        val channel = FileIO.open(fileName, openOptions)
+        val channel = fileHandleFactory(context.dispatcher)
         openChannel = Some(channel)
         channel
       }
@@ -103,22 +132,25 @@ class IOActor(fileName: Path,
   }
 
 
-  override def postStop() {
+  private def closeChannel() {
     channelInUse = false
-    openChannel.foreach(c=>c.close())
+    openChannel.foreach(c => c.close())
+    openChannel = None
+  }
+
+  override def postStop() {
+    closeChannel()
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]) {
-    channelInUse = false
-    openChannel.foreach(c=>c.close())
+    closeChannel()
   }
 
   def isChannelClosed = openChannel == None
 
   private case class UnexpectedResult(result: Any)
 
-  private case class ExceptionOccured(result: Exception)
+  private case class ExceptionOccured(exception: Exception)
 
   private case object CheckIfIsInUse
-
 }

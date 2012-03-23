@@ -6,7 +6,6 @@ import akka.dispatch.Await
 import akka.util.duration._
 import akka.util.Timeout
 import akka.testkit.TestActorRef
-import java.nio.file.StandardOpenOption
 import java.io.IOException
 import akka.actor._
 import java.util.concurrent.{TimeUnit, CountDownLatch}
@@ -53,7 +52,7 @@ class BasicIOActorSpec extends SpecBase {
       smallSize should be < (largeSize)
     }
     it("closes resource after timeout") {
-      val testRef = TestActorRef(new IOActor(TestFiles.inTestFolder("helloWorld.txt"), 1 milliseconds, Set(StandardOpenOption.READ)))
+      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx), 1 milliseconds))
 
       // send request to open channel
       val sizeRequest = (testRef ? FileSize)
@@ -76,6 +75,33 @@ class BasicIOActorSpec extends SpecBase {
 
       supervisor.underlyingActor.ioExceptionCounter must be(1)
     }
+    it("reports issue during reads") {
+      val supervisor = TestActorRef(new TestSupervisor())
+
+      val failingChannel = FailingTestChannels.failingChannel(system.dispatcher)
+      val failingFileSizeRequest = for{
+        fileHandlingActor <- (supervisor ? failingChannel).mapTo[ActorRef]
+        fileSize <- fileHandlingActor ? Read(0,200)
+      } yield fileSize
+
+      supervisor.underlyingActor.waitForFailure.await(1000,TimeUnit.SECONDS)
+
+      supervisor.underlyingActor.ioExceptionCounter must be(1)
+    }
+    it("can close channel") {
+      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx)))
+
+      val sizeAndClose = for{
+        sizeRequest <- (testRef ? FileSize)
+        close <- (testRef ? CloseChannel)
+
+      } yield close
+
+      Thread.sleep(200)
+
+      testRef.underlyingActor.isChannelClosed must be(true)
+    }
+
   }
 
   class TestSupervisor extends Actor {
@@ -92,6 +118,7 @@ class BasicIOActorSpec extends SpecBase {
 
     protected def receive = {
       case fileName: String => sender ! IOActors.createForFile(TestFiles.inTestFolder(fileName))(context)
+      case channel: FileChannelIO => sender ! context.actorOf(Props(new IOActor(ctx=>channel)))
       case CrashCount => sender ! ioExceptionCounter
     }
 
