@@ -42,6 +42,16 @@ object FileIO {
    */
   def open(fileName: Path, openOptions: OpenOption*)(implicit context: ExecutionContext): FileChannelIO
   = open(fileName, openOptions.toSet, context)
+  /**
+   * Opens a the specified file for the given path.
+   *
+   * @param fileName a valid path to a file
+   * @param openOptions the open options for the file. See [[java.nio.file.OpenOption]]
+   * @param context context on which the IO completion operations are executed
+   * @return
+   */
+  def open(fileName: Path, openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))(implicit context: ExecutionContext): FileChannelIO
+  = open(fileName, openOptions, context)
 
   /**
    * Opens a the specified file for the given path.
