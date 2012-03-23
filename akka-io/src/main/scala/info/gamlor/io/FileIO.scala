@@ -158,10 +158,37 @@ trait FileIO {
   /**
    * Reads a sequence of bytes from this file, starting at the given file position. Finally it returns the read data as a byte string.
    * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
-   * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
+   * @param amountToRead the amount to read in bytes.
    * @return future which will complete with the read data or exception.
    */
   def read(startPoint: Long, amountToRead: Int): Future[ByteString];
+
+  /**
+   * Reads this file and passes the read blocks to the given function. When the read process finishes the result of the function
+   * is returned in the future.
+   *
+   * The result of a future is always passed to the next invoked function. This way a function easily can accumulate the result.
+   * The value which is passed on the first call needs to be set.
+   * In case the function relies on side effects: The function is called on different threads, but never in parallel.
+   * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes.
+   * @param initialValue the value which is passed the first time the function is invoked.
+   * @param accumulationClosure the function which processes the data
+   * @return future which will complete with the read data or exception.
+   */
+  def readChunked[A](startPoint: Long, amountToRead: Int, initialValue:A)(accumulationClosure: (A,IO.Input)=>A): Future[A];
+
+  /**
+   * Reads this file and passes the read blocks to the given function. When the read process finishes the result of the function
+   * is returned in the future.
+   *
+   * The function is called on different threads, but never in parallel.
+   * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
+   * @param amountToRead the amount to read in bytes.
+   * @param processingFunction the function which processes the data chunks
+   * @return future which will complete with the read data or exception.
+   */
+  def readChunked[A](startPoint: Long, amountToRead: Int)(processingFunction: PartialFunction[IO.Input, A]): Future[A];
 
   /**
    * Reads a sequence of bytes and passes those bytes to the given iteratee.
@@ -248,6 +275,19 @@ trait AccumulationReadingBase extends FileIO{
   override def readSegments[A](segmentParser: Iteratee[A], startPos: Long, amountToRead: Long): Future[Seq[A]]
   = readAndAccumulate(Accumulators.parseSegments(segmentParser), startPos, amountToRead)
 
+  def readChunked[A](startPoint: Long, amountToRead: Int, initialValue: A)(accumulationClosure: (A, Input) => A)
+  = readAndAccumulate(Accumulators.functionAccumulator(initialValue,accumulationClosure),startPoint,amountToRead)
+
+
+  def readChunked[A](startPoint: Long, amountToRead: Int)(processingFunction: PartialFunction[Input, A]): Future[A] ={
+    readChunked[A](startPoint,amountToRead,null.asInstanceOf[A])((previousValue:A,data:IO.Input)=>
+      if(processingFunction.isDefinedAt(data)){
+        processingFunction(data)
+      } else{
+        null.asInstanceOf[A]
+      }
+    )
+  }
 
   /**
    * Used by the default implementation of the read methods to read the file.
@@ -266,6 +306,7 @@ trait AccumulationReadingBase extends FileIO{
    * @tparam A
    * @return
    */
+
   protected def readAndAccumulate[A](accumulator: Accumulator[A], startPos: Long = 0, amountToRead: Long = -1): Future[A]
 
   /**
@@ -308,6 +349,17 @@ trait AccumulationReadingBase extends FileIO{
       }
 
       def finishedValue() = builder.result()
+    }
+
+
+    def functionAccumulator[A](initialLastValue:A, function:(A,IO.Input)=>A) = new Accumulator[A] {
+      private var lastValue = initialLastValue;
+      def apply(input: Input): Boolean = {
+        lastValue = function(lastValue,input)
+        true
+      }
+
+      def finishedValue() = lastValue
     }
 
     def parseSegments[A](parser: Iteratee[A]) = new Accumulator[Seq[A]] {
