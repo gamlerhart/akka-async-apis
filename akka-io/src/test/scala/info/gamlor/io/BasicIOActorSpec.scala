@@ -4,11 +4,12 @@ import akka.pattern._
 import info.gamlor.io.IOActors._
 import akka.dispatch.Await
 import akka.util.duration._
-import akka.util.Timeout
 import akka.testkit.TestActorRef
 import java.io.IOException
 import akka.actor._
 import java.util.concurrent.{TimeUnit, CountDownLatch}
+import java.nio.file.StandardOpenOption
+import akka.util.{ByteString, Timeout}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -37,6 +38,19 @@ class BasicIOActorSpec extends SpecBase {
       content.amountToRead must be(11)
 
     }
+    it("can write") {
+      val fileActor = IOActors.createForFile(TestFiles.tempFile(),Set(StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.READ))
+
+
+      val operations = for {
+        w <- fileActor ? Write(ByteString("Hello World"),0)
+        fileSize <- (fileActor ? FileSize).mapTo[FileSizeResponse]
+        dataRead <- (fileActor ? Read(0, fileSize.size.toInt)).mapTo[ReadResponse]
+      } yield dataRead
+
+      val dataRead = Await.result(operations, 5 seconds)
+      dataRead.data.utf8String must be("Hello World")
+    }
     it("can have multiple actors") {
       val smallFileReader = IOActors.createForFile(TestFiles.inTestFolder("helloWorld.txt"))
       val largeFileReader = IOActors.createForFile(TestFiles.inTestFolder("largerTestFile.txt"))
@@ -52,7 +66,7 @@ class BasicIOActorSpec extends SpecBase {
       smallSize should be < (largeSize)
     }
     it("closes resource after timeout") {
-      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx), 1 milliseconds))
+      val testRef = TestActorRef(new IOActor(ctx=>FileIO.open(TestFiles.inTestFolder("helloWorld.txt"))(ctx), Some(1 milliseconds)))
 
       // send request to open channel
       val sizeRequest = (testRef ? FileSize)

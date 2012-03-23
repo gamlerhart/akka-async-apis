@@ -58,7 +58,7 @@ class FileChannelIO(val channel: AsynchronousFileChannel,
                            private var amountStillToRead: Long,
                            private val resultAccumulator: Accumulator[A]
                             ) extends CompletionHandler[java.lang.Integer, ContinuesReader[A]] {
-    val stepSize = min(32 * 1024, amountStillToRead).toInt;
+    val stepSize = min(64 * 1024, amountStillToRead).toInt;
     private val readBuffer = ByteBuffer.allocate(stepSize)
     private val promiseToComplete: Promise[A] = Promise[A]()
 

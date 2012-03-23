@@ -23,8 +23,8 @@ object IOActors {
    * @return
    */
   def createForFile(fileName: Path,
-                    autoCloseAfter: Duration = Duration(5, TimeUnit.SECONDS),
-                    openOptions: Set[OpenOption] = Set(StandardOpenOption.READ))(implicit actorFactory: ActorRefFactory): ActorRef = {
+                    openOptions: Set[OpenOption] = Set(StandardOpenOption.READ),
+                    autoCloseAfter: Option[Duration] = Some(Duration(5, TimeUnit.SECONDS)))(implicit actorFactory: ActorRefFactory): ActorRef = {
     actorFactory.actorOf(Props(new IOActor((ctx)=>FileIO.open(fileName,openOptions)(ctx), autoCloseAfter)))
   }
 
@@ -45,13 +45,23 @@ object IOActors {
   /**
    * Reads a sequence of bytes from this file, starting at the given file position. Finally it returns the read data as a byte string.
    *
-   * On a successfull read the respons is delivered as a [[info.gamlor.io.IOActors.ReadResponse]] message.
-   * In case of a failure the IOActor chrashes bye default and lets the the Akka failure handling kick in.
-   * @param startPoint start point of the read operation, from 0. If the start point is outside the file size, a empty result is returned
+   * On a successful read the response is delivered as a [[info.gamlor.io.IOActors.ReadResponse]] message.
+   * In case of a failure the IOActor crashes and the Akka failure handling kicks in. So this actor is intended to be supervised
+   * @param startPoint start point of the read operation, from 0, in bytes. If the start point is outside the file size, a empty result is returned
    * @param amountToRead the amount to read in bytes. A byte buffer of this size will be allocated.
    * @return future which will complete with the read data or exception.
    */
   case class Read(startPoint: Long, amountToRead: Int)
+
+  /**
+   * Writes the given data at the given point in the file. Then it return the amount of written bytes
+   *
+   * On a successful write the response is delivered as a [[info.gamlor.io.IOActors.WriteResponse]] message.
+   * In case of a failure the IOActor crashes and the Akka failure handling kicks in. So this actor is intended to be supervised
+   * @param dataToWrite the data to write
+   * @param startPoint start point of the read operation, from 0, in bytes. If the start point is outside the file size, a empty result is returned
+   */
+  case class Write(dataToWrite: ByteString, startPoint:Long)
 
   /**
    * Respons for [[info.gamlor.io.IOActors.FileSizeResponse]]
@@ -67,13 +77,19 @@ object IOActors {
    */
   case class ReadResponse(data: ByteString, startPoint: Long, amountToRead: Int)
 
+  /**
+   * Response for [[info.gamlor.io.IOActors.Write]]
+   * @param amountOfWrittenData
+   */
+  case class WriteResponse(amountOfWrittenData:Int)
+
 
 
 
 }
 
-class IOActor(fileHandleFactory:ExecutionContext=>FileIO,
-              autoCloseAfter: Duration = Duration(5, TimeUnit.SECONDS)) extends Actor {
+class IOActor(private val fileHandleFactory:ExecutionContext=>FileIO,
+              private val autoCloseAfter: Option[Duration] = Some(Duration(5, TimeUnit.SECONDS))) extends Actor {
 
   import info.gamlor.io.IOActors._
 
@@ -100,10 +116,22 @@ class IOActor(fileHandleFactory:ExecutionContext=>FileIO,
 
       }
     }
+    case Write(data, startPos) => {
+      inUsed()
+      val file = fileChannel()
+      val currentSender = sender
+      val currentSelf = self
+      file.write(data, startPos).onSuccess {
+        case amountBytesWritten: Int => currentSender ! WriteResponse(amountBytesWritten)
+        case unexpected => currentSelf ! UnexpectedResult(unexpected)
+      }.onFailure {
+        case ex: Exception => currentSelf ! ExceptionOccured(ex)
+      }
+    }
     case CheckIfIsInUse =>{
       if(channelInUse){
         channelInUse = false;
-        context.system.scheduler.scheduleOnce(autoCloseAfter,self,CheckIfIsInUse)
+        autoCloseAfter.foreach(timeout =>context.system.scheduler.scheduleOnce(timeout,self,CheckIfIsInUse))
       } else{
         closeChannel()
       }
@@ -128,7 +156,7 @@ class IOActor(fileHandleFactory:ExecutionContext=>FileIO,
   }
   private def inUsed() = {
     channelInUse = true
-    context.system.scheduler.scheduleOnce(autoCloseAfter,self,CheckIfIsInUse)
+    autoCloseAfter.foreach(timeout =>context.system.scheduler.scheduleOnce(timeout,self,CheckIfIsInUse))
   }
 
 
