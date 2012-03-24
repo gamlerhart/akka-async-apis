@@ -45,7 +45,7 @@ class BasicIOActorSpec extends SpecBase {
 
       fileActor.!(ReadInChunks(0, Int.MaxValue, "test-request"))(receiver.ref)
 
-      val msg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
+      val msg = receiver.receiveOne(5 seconds).asInstanceOf[ReadInChunksResponse]
 
       msg.identification must be("test-request")
       msg.data.isInstanceOf[IO.Chunk] must be(true)
@@ -59,8 +59,8 @@ class BasicIOActorSpec extends SpecBase {
 
       fileActor.!(ReadInChunks(0, Int.MaxValue, "test-request"))(receiver.ref)
 
-      val dataMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
-      val eofMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadChunk]
+      val dataMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadInChunksResponse]
+      val eofMsg = receiver.receiveOne(5 seconds).asInstanceOf[ReadInChunksResponse]
 
       dataMsg.identification must be("test-request")
       dataMsg.data.asInstanceOf[IO.Chunk].bytes.utf8String must be("Hello World")
