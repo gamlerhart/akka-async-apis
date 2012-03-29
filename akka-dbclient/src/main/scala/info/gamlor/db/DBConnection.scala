@@ -1,7 +1,7 @@
 package info.gamlor.db
 
-import org.adbcj.{DbFuture, DbListener, Connection, ResultSet}
-import akka.dispatch.{ExecutionContext, Promise, Future}
+import org.adbcj.{Connection, ResultSet}
+import akka.dispatch.{ExecutionContext, Future}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -14,16 +14,10 @@ object DBConnection {
 
 }
 
-class DBConnection(val connection:Connection, private implicit val context:ExecutionContext) {
+class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
 
   def executeQuery(sql:String) : Future[ResultSet] = {
-    val resultPromise = Promise[ResultSet]
-    connection.executeQuery(sql).addListener(new DbListener[ResultSet] {
-      def onCompletion(future: DbFuture[ResultSet]) {
-        resultPromise.success(future.get())
-      }
-    })
-    resultPromise
+    completeWithAkkaFuture[ResultSet,ResultSet](()=>connection.executeQuery(sql),rs=>rs)
   }
 
 }

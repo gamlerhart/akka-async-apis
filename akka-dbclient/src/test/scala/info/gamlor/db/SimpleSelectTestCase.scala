@@ -43,6 +43,17 @@ class SimpleSelectTestCase extends SpecBaseWithH2{
       val result = Await.result(selectedOne, 5 seconds)
       result must be (1)
     }
+    it("fail with invalid select"){
+      var selectedOne = for{
+        connection <-Database(system).connect()
+        r <- connection.executeQuery("SELECT this is  Not Valid, or is it?")
+
+      } yield r.get(0).get(0).getInt;
+
+
+      val result = Await.ready(selectedOne, 5 seconds)
+      result.value.get.isLeft must be (true)
+    }
   }
 
 
