@@ -30,7 +30,7 @@ class DatabaseAccess(val connectionManager: ConnectionManager,
     val akkaPromise = Promise[DBConnection]
     connectionManager.connect().addListener(new DbListener[Connection] {
       def onCompletion(future: DbFuture[Connection]) {
-        akkaPromise.success(DBConnection())
+        akkaPromise.success(DBConnection(future.get()))
       }
     })
     akkaPromise
