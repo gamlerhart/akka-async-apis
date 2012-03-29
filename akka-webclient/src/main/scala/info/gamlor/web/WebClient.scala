@@ -2,12 +2,12 @@ package info.gamlor.web
 
 import akka.actor.{Extension, ExtensionIdProvider, ExtendedActorSystem, ExtensionId}
 import akka.util.ByteString
-import com.ning.http.client._
 import akka.dispatch.{ExecutionContext, Promise, Future}
-import com.ning.http.client.AsyncHandler.STATE
 import java.util.concurrent.CancellationException
 import java.nio.file.Path
 import java.io.File
+import com.ning.http.client._
+import com.ning.http.client.AsyncHandler.STATE
 
 
 /**
@@ -15,6 +15,23 @@ import java.io.File
  * @since 05.03.12
  */
 
+/**
+ * Integration for the Async HTTP library with Akka.
+ *
+ * Use this to get the web client instance assiosiated with this actor system.
+ * The client will be initializied with the settings specified in the Akka/System configuration.
+ *
+ * Usage:
+ * <pre>
+ *   val webAccess = WebClient(actorSystem)
+ *   val futureWithResult = webAccess.prepareGet("http://some.site.localhost").execute()
+ *
+ *   // handel result of the future
+ * </pre>
+ *
+ * If you want to manually create a instance you can use [[info.gamlor.web.WebClient]] to wrap
+ * the [[com.ning.http.client.AsyncHttpClient]] you want to use.
+ */
 object WebClient
   extends ExtensionId[WebClient]
   with ExtensionIdProvider {
@@ -34,22 +51,53 @@ class WebClient(private val context:ExecutionContext,
                  ) extends Extension {
 
 
+  /**
+   * Creates a new get request. Add options to the given builder and then
+   * execute the request with [[info.gamlor.web.WebRequestBuilder#execute()]]
+   * @param url a valid URL for a HTTP or HTTPS site
+   * @return builder to add additional settings
+   */
   def prepareGet(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.prepareGet(url)
     new WebRequestBuilder(f,context)
   }
+  /**
+   * Creates a new post request. Add options to the given builder and then
+   * execute the request with [[info.gamlor.web.WebRequestBuilder#execute()]]
+   * @param url a valid URL for a HTTP or HTTPS site
+   * @return builder to add additional settings
+   */
   def preparePost(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.preparePost(url)
     new WebRequestBuilder(f,context)
   }
+  /**
+   * Creates a new put request. Add options to the given builder and then
+   * execute the request with [[info.gamlor.web.WebRequestBuilder#execute()]]
+   * @param url a valid URL for a HTTP or HTTPS site
+   * @return builder to add additional settings
+   */
   def preparePut(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.preparePut(url)
     new WebRequestBuilder(f,context)
   }
+
+  /**
+   * Creates a new delete request. Add options to the given builder and then
+   * execute the request with [[info.gamlor.web.WebRequestBuilder#execute()]]
+   * @param url a valid URL for a HTTP or HTTPS site
+   * @return builder to add additional settings
+   */
   def prepareDelete(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.prepareDelete(url)
     new WebRequestBuilder(f,context)
   }
+  /**
+   * Creates a new head request. Add options to the given builder and then
+   * execute the request with [[info.gamlor.web.WebRequestBuilder#execute()]]
+   * @param url a valid URL for a HTTP or HTTPS site
+   * @return builder to add additional settings
+   */
   def prepareHead(url: String): WebRequestBuilder = {
     val f = asyncHttpClient.prepareHead(url)
     new WebRequestBuilder(f,context)
@@ -60,6 +108,11 @@ class WebClient(private val context:ExecutionContext,
 class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#BoundRequestBuilder,
                       private val context:ExecutionContext) {
 
+  /**
+   * Executes this request. The result or error of the completed
+   * request is passed to the future.
+   * @return future which will complete with the result or an error
+   */
   def execute():Future[Response] = {
     val result = Promise[Response]()(context)
     unterlyingRequestBuilder.execute(new AsyncCompletionHandler[Response] {
@@ -74,6 +127,16 @@ class WebRequestBuilder(private val unterlyingRequestBuilder: AsyncHttpClient#Bo
     })
     result
   }
+
+  /**
+   * Same as [[info.gamlor.web.WebRequestBuilder#execute()]] but with additional async handler.
+   * The async handler allows you to process the request result while the data is arriving.
+   *
+   * You also can cancel the request processing at any time by returning a [[com.ning.http.client.AsyncHandler.STATE.ABORT]]
+   * @param handler the response handler which will be called
+   * @tparam A the type of the resulting data
+   * @return a future which will complete with the result or an error
+   */
   def execute[A](handler: AsyncHandler[A]):Future[A] = {
     val result = Promise[A]()(context)
     unterlyingRequestBuilder.execute(new AsyncHandler[A] {
