@@ -1,6 +1,7 @@
 package info.gamlor.db
 
-import org.adbcj.ResultSet
+import scala.collection.JavaConversions._
+import org.adbcj.{Field, ResultSet}
 
 
 /**
@@ -11,16 +12,23 @@ import org.adbcj.ResultSet
 class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
   def length = resultSet.size()
 
-  def apply(idx: Int) = new DBResultRow(resultSet.get(0))
+  def apply(idx: Int) = new DBResultRow(resultSet.get(idx),this)
+  def apply(rowIndex: Int,columnIndex:Int) = resultSet.get(rowIndex).get(columnIndex)
 
-  def get(index:Int) = new DBResultRow(resultSet.get(0))
+  def get(index:Int) = new DBResultRow(resultSet.get(0),this)
+
+  def fieldByName(fieldName:String):Option[Field] = fieldsByName.get(fieldName)
+  /**
+   * Fiels by all lower case names
+   */
+  lazy val fieldsByName = resultSet.getFields.map(f=>(f.getColumnLabel.toLowerCase,f)).toMap
 
   def iterator = {
     val iter = resultSet.iterator()
     new Iterator[DBResultRow] {
       def hasNext = iter.hasNext
 
-      def next() = new DBResultRow(iter.next())
+      def next() = new DBResultRow(iter.next(),DBResultList.this)
     }
   }
 }
