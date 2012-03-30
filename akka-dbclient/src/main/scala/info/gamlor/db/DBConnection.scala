@@ -16,8 +16,8 @@ object DBConnection {
 
 class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
 
-  def executeQuery(sql:String) : Future[ResultSet] = {
-    completeWithAkkaFuture[ResultSet,ResultSet](()=>connection.executeQuery(sql),rs=>rs)
+  def executeQuery(sql:String) : Future[DBResultList] = {
+    completeWithAkkaFuture[ResultSet,DBResultList](()=>connection.executeQuery(sql),rs=>new DBResultList(rs))
   }
 
   def executeUpdate(sql: String) :Future[Result] ={
