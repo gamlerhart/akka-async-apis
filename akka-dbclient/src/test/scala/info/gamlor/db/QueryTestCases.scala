@@ -89,6 +89,21 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
       assert(iteratedThroughResult.contains("Jim"))
       assert(iteratedThroughResult.contains("Joanna"))
     }
+    it("iterate row"){
+      val resultFuture = for {
+        connection <- Database(system).connect()
+        result <- connection.executeQuery("SELECT name, firstname, bornInYear FROM testTable ORDER BY bornInYear DESC LIMIT 1")
+        closed <- connection.close()
+      } yield result
+
+      val result = Await.result(resultFuture, 5 seconds)
+      var row = result.get(0)
+      var iteratedThroughColums = for{column<-row} yield column.getString
+
+      assert(iteratedThroughColums.contains("Joe"))
+      assert(iteratedThroughColums.contains("Average"))
+      assert(iteratedThroughColums.contains("1990"))
+    }
 
   }
 
