@@ -36,13 +36,15 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
 
   }
 
+  def selectAll() = for {
+      connection <- Database(system).connect()
+      result <- connection.executeQuery("SELECT * FROM testTable ORDER BY bornInYear DESC")
+      closed <- connection.close()
+    } yield result
+
   describe("Query Support") {
     it("can access by indexes"){
-      val resultFuture = for {
-        connection <- Database(system).connect()
-        result <- connection.executeQuery("SELECT * FROM testTable ORDER BY bornInYear DESC")
-        closed <- connection.close()
-      } yield result
+      val resultFuture = selectAll()
 
       val result = Await.result(resultFuture, 5 seconds)
       result.size must be(4)
@@ -54,17 +56,38 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
       result(3,1).getString must be("Joanna")
     }
     it("can access by row name"){
-      val resultFuture = for {
-        connection <- Database(system).connect()
-        result <- connection.executeQuery("SELECT * FROM testTable ORDER BY bornInYear DESC")
-        closed <- connection.close()
-      } yield result
+      val resultFuture = selectAll()
 
       val result = Await.result(resultFuture, 5 seconds)
       result.size must be(4)
       result(0)("firstname").getString must be("Joe")
       result(0)("name").getString must be("Average")
       result(0)("bornInYear").getLong must be(1990)
+      result(1)("firstname").getLong must be("Roman")
+      result(2)("firstname").getLong must be("Jim")
+      result(2)("firstname").getLong must be("Joanna")
+    }
+    it("projection"){
+      val resultFuture = for {
+        connection <- Database(system).connect()
+        result <- connection.executeQuery("SELECT name FROM testTable ORDER BY bornInYear DESC LIMIT 1")
+        closed <- connection.close()
+      } yield result
+
+      val result = Await.result(resultFuture, 5 seconds)
+      result.size must be(1)
+      result(0)("name").getString must be("Average")
+    }
+    it("iterate over result is possible"){
+        val resultFuture = selectAll()
+
+      val result = Await.result(resultFuture, 5 seconds)
+      var iteratedThroughResult = for{row <- result} yield row.get(1).getString
+
+      assert(iteratedThroughResult.contains("Joe"))
+      assert(iteratedThroughResult.contains("Roman"))
+      assert(iteratedThroughResult.contains("Jim"))
+      assert(iteratedThroughResult.contains("Joanna"))
     }
 
   }
