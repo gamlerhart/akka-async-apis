@@ -54,6 +54,26 @@ class SimpleSelectTestCase extends SpecBaseWithH2 {
       val result = Await.ready(selectedOne, 5 seconds)
       result.value.get.isLeft must be(true)
     }
+    it("can create schema") {
+      var insertTable = for {
+        connection <- Database(system).connect()
+        create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS testTable (id INT)")
+        insert <- connection.executeUpdate("INSERT INTO testTable VALUES(1)")
+        closed <- connection.close()
+      } yield insert.getAffectedRows;
+
+      val createResult = Await.result(insertTable, 5 seconds)
+      createResult must be(1L)
+
+      var dropTable = for {
+        connection <- Database(system).connect()
+        create <- connection.executeUpdate("DROP TABLE testTable")
+        closed <- connection.close()
+      } yield create.getAffectedRows;
+
+      val dropResult = Await.result(dropTable, 5 seconds)
+      dropResult must not be(null)
+    }
     it("can close connection") {
       var future = for {
         connection <- Database(system).connect()
