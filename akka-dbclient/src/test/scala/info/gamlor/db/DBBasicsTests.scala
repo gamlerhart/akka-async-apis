@@ -9,7 +9,7 @@ import org.adbcj.ConnectionManagerProvider
  * @since 29.03.12
  */
 
-class SimpleSelectTestCase extends SpecBaseWithH2 {
+class DBBasicsTests extends SpecBaseWithH2 {
 
 
   describe("Basic DB operations") {
@@ -57,8 +57,8 @@ class SimpleSelectTestCase extends SpecBaseWithH2 {
     it("can create schema") {
       var insertTable = for {
         connection <- Database(system).connect()
-        create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS testTable (id INT)")
-        insert <- connection.executeUpdate("INSERT INTO testTable VALUES(1)")
+        create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS simpleTable (id INT)")
+        insert <- connection.executeUpdate("INSERT INTO simpleTable VALUES(1)")
         closed <- connection.close()
       } yield insert.getAffectedRows;
 
@@ -67,7 +67,7 @@ class SimpleSelectTestCase extends SpecBaseWithH2 {
 
       var dropTable = for {
         connection <- Database(system).connect()
-        create <- connection.executeUpdate("DROP TABLE testTable")
+        create <- connection.executeUpdate("DROP TABLE simpleTable")
         closed <- connection.close()
       } yield create.getAffectedRows;
 
