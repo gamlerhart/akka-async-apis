@@ -98,11 +98,24 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
 
       val result = Await.result(resultFuture, 5 seconds)
       var row = result.get(0)
-      var iteratedThroughColums = for{column<-row} yield column.getString
+      var iteratedThroughColumns = for{column<-row} yield column.getString
 
-      assert(iteratedThroughColums.contains("Joe"))
-      assert(iteratedThroughColums.contains("Average"))
-      assert(iteratedThroughColums.contains("1990"))
+      assert(iteratedThroughColumns.contains("Joe"))
+      assert(iteratedThroughColumns.contains("Average"))
+      assert(iteratedThroughColumns.contains("1990"))
+    }
+
+    it("get fields"){
+      val resultFuture = selectAll()
+
+      val result = Await.result(resultFuture, 5 seconds)
+      result.fieldsByName.size must be(4)
+
+
+
+      result.get(0)(result.fieldByName("firstname").get).getString must be("Joe")
+      result.get(0)(result.fieldByName("name").get).getString must be("Average")
+      result.fieldByName("notExistingField") must be(None)
     }
 
   }
