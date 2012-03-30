@@ -264,7 +264,7 @@ trait FileIO {
    * Any outstanding asynchronous operations upon this channel will complete with the exception AsynchronousCloseException.
    * After a channel is closed, further attempts to initiate asynchronous I/O operations complete immediately with cause ClosedChannelException.
    */
-  def close()
+  def close() :Future[Unit]
 
 
 }
