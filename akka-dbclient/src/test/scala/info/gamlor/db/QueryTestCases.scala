@@ -63,9 +63,10 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
       result(0)("firstname").getString must be("Joe")
       result(0)("name").getString must be("Average")
       result(0)("bornInYear").getLong must be(1990)
-      result(1)("firstname").getLong must be("Roman")
-      result(2)("firstname").getLong must be("Jim")
-      result(2)("firstname").getLong must be("Joanna")
+      result(1)("firstname").getString must be("Roman")
+      result(2)("firstname").getString must be("Jim")
+      result(3)("firstname").getString must be("Joanna")
+      result(3,"firstname").getString must be("Joanna")
     }
     it("projection"){
       val resultFuture = for {

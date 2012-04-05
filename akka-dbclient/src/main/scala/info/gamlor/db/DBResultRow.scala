@@ -10,7 +10,7 @@ import org.adbcj.{Field, Value, Row}
 
 class DBResultRow(val row: Row, resultList:DBResultList) extends Seq[Value]{
   def get(index: Int):Value = row.get(index)
-  def get(columnName: String):Value = row.get(columnName)
+  def get(columnName: String):Value = apply(columnName)
   def apply(columnName: String):Value = row.get(resultList.fieldByName(columnName.toLowerCase())
     .getOrElse(throw new IllegalArgumentException("The field with the name "+columnName+" does not exist")))
   def apply(index: Int):Value = row.get(index)

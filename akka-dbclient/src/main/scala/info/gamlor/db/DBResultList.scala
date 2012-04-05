@@ -1,7 +1,7 @@
 package info.gamlor.db
 
 import scala.collection.JavaConversions._
-import org.adbcj.{Field, ResultSet}
+import org.adbcj.{Value, Field, ResultSet}
 
 
 /**
@@ -14,6 +14,7 @@ class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
 
   def apply(idx: Int) = new DBResultRow(resultSet.get(idx),this)
   def apply(rowIndex: Int,columnIndex:Int) = resultSet.get(rowIndex).get(columnIndex)
+  def apply(rowIndex: Int,column:String):Value = apply(rowIndex).get(column)
 
   def get(index:Int) = new DBResultRow(resultSet.get(0),this)
 
