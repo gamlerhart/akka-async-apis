@@ -6,6 +6,7 @@ import akka.dispatch.{Promise, Future, ExecutionContext}
 import java.nio.channels.{CompletionHandler, AsynchronousFileChannel}
 import akka.actor.IO
 import akka.util.ByteString
+import java.io.IOException
 
 class FileChannelIO(val channel: AsynchronousFileChannel,
                     private implicit val context: ExecutionContext) extends AccumulationReadingBase {
@@ -22,12 +23,29 @@ class FileChannelIO(val channel: AsynchronousFileChannel,
 
 
   /**
-   * Closes this file and the underlying channel.
+   * Closes this file and the underlying channel immediately
    *
    * Any outstanding asynchronous operations upon this channel will complete with the exception AsynchronousCloseException.
    * After a channel is closed, further attempts to initiate asynchronous I/O operations complete immediately with cause ClosedChannelException.
+   *
+   * It returns a future so that you can easily use it in a for comprehension:
+   * <pre>
+   * val readStuff = for {
+   *    r <- file.read(0, file.size().toInt)
+   *    c <- file.close()
+   * } yield r
+   *
+   * If a IOException happens during the close operation it will be contained in the future.
+   * </pre>
    */
-  def close() = channel.close()
+  def close() :Future[Unit] = {
+    try{
+      channel.close()
+      Promise.successful[Unit]()
+    } catch {
+      case ex:IOException =>Promise.failed[Unit](ex)
+    }
+  }
 
 
   protected def readAndAccumulate[A](parser: Accumulator[A], startPos: Long = 0, amountToRead: Long = -1) = {

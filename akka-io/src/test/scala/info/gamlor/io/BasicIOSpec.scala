@@ -6,6 +6,7 @@ import akka.util.ByteString
 import akka.actor.IO
 import java.util.concurrent.atomic.AtomicReference
 import akka.dispatch.{Promise, Await}
+import java.io.IOException
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -53,6 +54,21 @@ class BasicIOSpec extends SpecBase {
       content.utf8String must be("Hello World")
 
       file.close()
+    }
+    it("can close future style") {
+      val file = FileIO.open(TestFiles.tempFile(), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ)
+
+      val readStuff = for {
+        r <- file.read(0, file.size().toInt)
+        c <- file.close()
+      } yield r
+
+      val content = Await.result(readStuff, 5 seconds)
+      content.utf8String must be("")
+
+      intercept[IOException]{
+        file.size()
+      }
     }
     it("read from offset") {
       val file = FileIO.open(TestFiles.inTestFolder("helloWorld.txt").toString)
