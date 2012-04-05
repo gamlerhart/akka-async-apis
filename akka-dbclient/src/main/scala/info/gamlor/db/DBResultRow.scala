@@ -8,18 +8,17 @@ import org.adbcj.{Field, Value, Row}
  * @since 30.03.12
  */
 
-class DBResultRow(val row: Row, resultList:DBResultList) extends Seq[Value]{
+class DBResultRow(val row: Row) extends Seq[Value]{
   def get(index: Int):Value = row.get(index)
   def get(columnName: String):Value = apply(columnName)
-  def apply(columnName: String):Value = row.get(resultList.fieldByName(columnName.toLowerCase())
-    .getOrElse(throw new IllegalArgumentException("The field with the name "+columnName+" does not exist")))
+  def apply(columnName: String):Value = row.get(getFieldByName(columnName))
   def apply(index: Int):Value = row.get(index)
   def apply(field: Field):Value = row.get(field)
 
   def length = row.size()
 
   def iterator = {
-    val fieldsIterator = resultList.fieldsByName.values.iterator
+    val fieldsIterator = row.getResultSet.getFields.iterator
     new Iterator[Value] {
       def hasNext = fieldsIterator.hasNext
 
@@ -27,6 +26,13 @@ class DBResultRow(val row: Row, resultList:DBResultList) extends Seq[Value]{
         val field = fieldsIterator.next()
         row.get(field)
       }
+    }
+  }
+
+  private def getFieldByName(fieldName:String) = {
+    row.getResultSet.getField(fieldName.toUpperCase) match{
+      case f:Field => f
+      case null => throw new IllegalArgumentException("Field '"+fieldName+"' does not exist")
     }
   }
 }

@@ -110,13 +110,24 @@ class QueryTestCases extends SpecBaseWithH2 with BeforeAndAfter {
       val resultFuture = selectAll()
 
       val result = Await.result(resultFuture, 5 seconds)
-      result.fieldsByName.size must be(4)
+      result.fields.size must be(4)
 
 
 
-      result.get(0)(result.fieldByName("firstname").get).getString must be("Joe")
-      result.get(0)(result.fieldByName("name").get).getString must be("Average")
-      result.fieldByName("notExistingField") must be(None)
+      result.get(0)(result.fields(1)).getString must be("Joe")
+      result.get(0)(result.fields(2)).getString must be("Average")
+    }
+
+  }
+
+  describe("Prepared Statement Query Support") {
+    it("can query with it"){
+      for{connection <- Database(system).connect()
+      result <- connection.executeQuery("SELECT * FROM testTable" +
+        "WHERE bornInYear>?  ORDER BY bornInYear DESC")
+      closed <- connection.close()
+      } yield result
+
     }
 
   }
