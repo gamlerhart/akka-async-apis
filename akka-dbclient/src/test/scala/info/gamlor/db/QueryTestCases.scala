@@ -101,6 +101,8 @@ class QueryTestCases extends SpecBaseWithDB {
       val result = Await.result(resultFuture, 5 seconds)
 
       result.size must be(2)
+      result.get(0).get("bornInYear").getString must be("1990")
+      result.get(1).get("bornInYear").getString must be("1986")
 
     }
 

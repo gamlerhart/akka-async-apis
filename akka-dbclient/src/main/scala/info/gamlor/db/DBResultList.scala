@@ -16,7 +16,7 @@ class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
   def apply(rowIndex: Int,columnIndex:Int) = resultSet.get(rowIndex).get(columnIndex)
   def apply(rowIndex: Int,column:String):Value = apply(rowIndex).get(column)
 
-  def get(index:Int) = new DBResultRow(resultSet.get(0))
+  def get(index:Int) = new DBResultRow(resultSet.get(index))
 
   def fields = resultSet.getFields.toSeq
 

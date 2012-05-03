@@ -39,4 +39,6 @@ class DBPreparedStatement(statement:PreparedStatement, implicit val context:Exec
     val boxed = args.map(v=>v.asInstanceOf[AnyRef])
     completeWithAkkaFuture[ResultSet,DBResultList](()=>statement.executeQuery(boxed:_*),rs=>new DBResultList(rs))
   }
+
+  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>statement.close(),_=>())
 }
