@@ -1,7 +1,7 @@
 package info.gamlor.db
 
-import org.adbcj.{DbFuture, DbListener, Connection, ResultSet}
-import akka.dispatch.{ExecutionContext, Promise, Future}
+import akka.dispatch.{ExecutionContext, Future}
+import org.adbcj.{Result, Connection, ResultSet}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -14,16 +14,17 @@ object DBConnection {
 
 }
 
-class DBConnection(val connection:Connection, private implicit val context:ExecutionContext) {
+class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
 
-  def executeQuery(sql:String) : Future[ResultSet] = {
-    val resultPromise = Promise[ResultSet]
-    connection.executeQuery(sql).addListener(new DbListener[ResultSet] {
-      def onCompletion(future: DbFuture[ResultSet]) {
-        resultPromise.success(future.get())
-      }
-    })
-    resultPromise
+  def executeQuery(sql:String) : Future[DBResultList] = {
+    completeWithAkkaFuture[ResultSet,DBResultList](()=>connection.executeQuery(sql),rs=>new DBResultList(rs))
   }
 
+  def executeUpdate(sql: String) :Future[Result] ={
+    completeWithAkkaFuture[Result,Result](()=>connection.executeUpdate(sql),rs=>rs)
+  }
+
+  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>connection.close(false),_=>())
+
+  def isClosed = connection.isClosed
 }

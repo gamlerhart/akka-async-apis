@@ -1,7 +1,7 @@
 package info.gamlor.db
 
 import akka.actor.{ExtendedActorSystem, Extension, ExtensionIdProvider, ExtensionId}
-import akka.dispatch.{Promise, Future, ExecutionContext}
+import akka.dispatch.{Future, ExecutionContext}
 import org.adbcj._
 
 /**
@@ -18,22 +18,25 @@ object Database
     val config = DatabaseSettings(system.settings.config)
     val connectionManager =
       ConnectionManagerProvider.createConnectionManager(config.url, config.userName, config.passWord)
-    val client = new DatabaseAccess(connectionManager,system.dispatcher)
+    val client = new DatabaseAccess(connectionManager, system.dispatcher)
     client
   }
 
 }
 
 class DatabaseAccess(val connectionManager: ConnectionManager,
-                     private implicit val context: ExecutionContext) extends Extension {
+                     implicit val context: ExecutionContext
+                      ) extends Extension with FutureConversions {
+
+
+  /**
+   * Connects to the database and returns the connection in a future
+   *
+   * In case of a failure the closure finishes with a [[org.adbcj.DbException]]
+   * @return future which completes with the connection or a [[org.adbcj.DbException]]
+   */
   def connect(): Future[DBConnection] = {
-    val akkaPromise = Promise[DBConnection]
-    connectionManager.connect().addListener(new DbListener[Connection] {
-      def onCompletion(future: DbFuture[Connection]) {
-        akkaPromise.success(DBConnection(future.get()))
-      }
-    })
-    akkaPromise
+    completeWithAkkaFuture[Connection, DBConnection](() => connectionManager.connect(), c => DBConnection(c))
   }
 
 }

@@ -32,7 +32,7 @@ object AkkaAsyncModules extends Build  {
     id = "akka-dbclient",
     base = file("./akka-dbclient"),
     settings = defaultSettings ++ Seq(
-      libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, mockito,ajdbc,ajdbcJdbcBridgeForTests,h2DBForTests)
+      libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, ajdbc,ajdbcJdbcBridgeForTests,h2DBForTests,loggingBinding)
     )) dependsOn (akkaIO)
 
 
@@ -70,5 +70,7 @@ object Dependencies {
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"
 
   val simpleTestServer = "org.simpleframework" % "simple" % "4.1.21"  % "test"
+
+  val loggingBinding = "org.slf4j" % "slf4j-simple" % "1.6.2" % "test"
 
 }
