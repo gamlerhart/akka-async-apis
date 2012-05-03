@@ -24,7 +24,7 @@ class DBConnection(val connection:Connection, implicit val context:ExecutionCont
     completeWithAkkaFuture[Result,Result](()=>connection.executeUpdate(sql),rs=>rs)
   }
 
-  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>connection.close(false),_=>())
+  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>connection.close(),_=>())
 
   def isClosed = connection.isClosed
 }
