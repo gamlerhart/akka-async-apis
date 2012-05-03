@@ -9,7 +9,7 @@ import org.adbcj.ConnectionManagerProvider
  * @since 29.03.12
  */
 
-class DBBasicsTests extends SpecBaseWithH2 {
+class DBBasicsTests extends SpecBaseWithDB {
 
 
   describe("Basic DB operations") {
