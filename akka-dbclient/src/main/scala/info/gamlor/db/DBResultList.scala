@@ -1,7 +1,7 @@
 package info.gamlor.db
 
 import scala.collection.JavaConversions._
-import org.adbcj.{Value, ResultSet}
+import org.adbcj.{Result, Value, ResultSet}
 
 
 /**
@@ -28,4 +28,11 @@ class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
       def next() = new DBResultRow(iter.next())
     }
   }
+}
+
+
+class DBResult(val resultSet: Result){
+    def affectedRows = resultSet.getAffectedRows;
+    val warnings = resultSet.getWarnings.toSeq;
+    val generatedKeys = new DBResultList(resultSet.getGeneratedKeys);
 }

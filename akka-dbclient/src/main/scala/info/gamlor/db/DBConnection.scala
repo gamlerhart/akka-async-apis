@@ -2,7 +2,7 @@ package info.gamlor.db
 
 import scala.Predef._
 import akka.dispatch.{ExecutionContext, Future}
-import org.adbcj.{PreparedStatement, Result, Connection, ResultSet}
+import org.adbcj._
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -16,8 +16,13 @@ object DBConnection {
 }
 
 class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
-  def prepareStatement(sql: String) : Future[DBPreparedStatement] ={
-    completeWithAkkaFuture[PreparedStatement,DBPreparedStatement](()=>connection.prepareStatement(sql),ps=>new DBPreparedStatement(ps,context))
+  def prepareQuery(sql: String) : Future[DBPreparedQuery] ={
+    completeWithAkkaFuture[PreparedQuery,DBPreparedQuery](
+      ()=>connection.prepareQuery(sql),ps=>new DBPreparedQuery(ps,context))
+  }
+  def prepareUpdate(sql: String) : Future[DBPreparedUpdate] ={
+    completeWithAkkaFuture[PreparedUpdate,DBPreparedUpdate](
+      ()=>connection.prepareUpdate(sql),ps=>new DBPreparedUpdate(ps,context))
   }
 
 
@@ -34,10 +39,18 @@ class DBConnection(val connection:Connection, implicit val context:ExecutionCont
   def isClosed = connection.isClosed
 }
 
-class DBPreparedStatement(statement:PreparedStatement, implicit val context:ExecutionContext) extends FutureConversions{
+class DBPreparedQuery(statement:PreparedQuery, implicit val context:ExecutionContext) extends FutureConversions{
   def execute(args:Any*):Future[DBResultList] ={
     val boxed = args.map(v=>v.asInstanceOf[AnyRef])
-    completeWithAkkaFuture[ResultSet,DBResultList](()=>statement.executeQuery(boxed:_*),rs=>new DBResultList(rs))
+    completeWithAkkaFuture[ResultSet,DBResultList](()=>statement.execute(boxed:_*),rs=>new DBResultList(rs))
+  }
+
+  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>statement.close(),_=>())
+}
+class DBPreparedUpdate(statement:PreparedUpdate, implicit val context:ExecutionContext) extends FutureConversions{
+  def execute(args:Any*):Future[DBResult] ={
+    val boxed = args.map(v=>v.asInstanceOf[AnyRef])
+    completeWithAkkaFuture[Result,DBResult](()=>statement.execute(boxed:_*),rs=>new DBResult(rs))
   }
 
   def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>statement.close(),_=>())

@@ -55,7 +55,7 @@ class DBBasicsTests extends SpecBaseWithDB {
       result.value.get.isLeft must be(true)
     }
     it("can create schema") {
-      var insertTable = for {
+      val insertTable = for {
         connection <- Database(system).connect()
         create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS simpleTable (id INT)")
         insert <- connection.executeUpdate("INSERT INTO simpleTable VALUES(1)")
@@ -65,14 +65,14 @@ class DBBasicsTests extends SpecBaseWithDB {
       val createResult = Await.result(insertTable, 5 seconds)
       createResult must be(1L)
 
-      var dropTable = for {
+      val dropTable = for {
         connection <- Database(system).connect()
         create <- connection.executeUpdate("DROP TABLE simpleTable")
         closed <- connection.close()
       } yield create.getAffectedRows;
 
       val dropResult = Await.result(dropTable, 5 seconds)
-      dropResult must not be(null)
+      assert(null!=dropResult)
     }
     it("can close connection") {
       var future = for {

@@ -29,8 +29,10 @@ class SpecBaseWithDB
   before {
       val createdSchema = for {
         connection <- Database(system).connect()
-        create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS testTable " +
+        _ <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS testTable " +
           "(id INT IDENTITY PRIMARY KEY, firstname VARCHAR(255), name VARCHAR(255) , bornInYear INT)")
+        _ <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS insertTable " +
+          "(id INT IDENTITY PRIMARY KEY, data VARCHAR(255))")
         insert <- connection.executeUpdate("INSERT INTO testTable(firstname,name,bornInYear)" +
           " VALUES('Roman','Stoffel',1986)," +
           "('Joe','Average',1990)," +
