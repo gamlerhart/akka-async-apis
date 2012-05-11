@@ -2,7 +2,7 @@ package info.gamlor.db
 
 import scala.Predef._
 import org.adbcj._
-import akka.dispatch.{Promise, ExecutionContext, Future}
+import akka.dispatch.{Future, Promise, ExecutionContext}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -11,64 +11,87 @@ import akka.dispatch.{Promise, ExecutionContext, Future}
 
 object DBConnection {
 
-  def apply(connection:Connection)(implicit context:ExecutionContext):DBConnection = new DBConnection(connection, context)
+  def apply(connection: Connection)(implicit context: ExecutionContext): DBConnection = new DBConnection(connection, context)
 
 }
 
-class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
-  def commit() : Future[Unit] ={
-      connection.commit()
-      Promise.successful[Unit]()
-    }
+class DBConnection(val connection: Connection, implicit val context: ExecutionContext) extends FutureConversions {
 
-  def beginTransaction() : Future[Unit] ={
+  /**
+   * Runs a transaction with this connection. The transaction is committed when the future which the given operation
+   * returns. In case you want to roll the transaction back you need to call .rollback()
+   *
+   * If a transaction is already running, it will be reused.
+   *
+   *
+   * @param operation the database operations to run
+   * @tparam T return type
+   */
+  def withTransaction[T](operation: DBConnection => Future[T]): Future[T] = {
+    if (!connection.isInTransaction) {
+      connection.beginTransaction()
+    }
+    for{
+      txOperation <- operation(this)
+      closeOperation <- commit()
+    } yield txOperation
+  }
+
+  def commit(): Future[Unit] = {
+    completeWithAkkaFuture[Void, Unit](
+      () => connection.commit(), ps => ())
+  }
+
+  def beginTransaction(): Future[Unit] = {
     connection.beginTransaction()
     Promise.successful[Unit]()
   }
 
-  def rollback() : Future[Unit] ={
-    connection.rollback()
-    Promise.successful[Unit]()
+  def rollback(): Future[Unit] = {
+    completeWithAkkaFuture[Void, Unit](
+      () => connection.rollback(), ps => ())
   }
 
-  def isInTransaction() : Boolean = connection.isInTransaction
+  def isInTransaction(): Boolean = connection.isInTransaction
 
-  def prepareQuery(sql: String) : Future[DBPreparedQuery] ={
-    completeWithAkkaFuture[PreparedQuery,DBPreparedQuery](
-      ()=>connection.prepareQuery(sql),ps=>new DBPreparedQuery(ps,context))
-  }
-  def prepareUpdate(sql: String) : Future[DBPreparedUpdate] ={
-    completeWithAkkaFuture[PreparedUpdate,DBPreparedUpdate](
-      ()=>connection.prepareUpdate(sql),ps=>new DBPreparedUpdate(ps,context))
+  def prepareQuery(sql: String): Future[DBPreparedQuery] = {
+    completeWithAkkaFuture[PreparedQuery, DBPreparedQuery](
+      () => connection.prepareQuery(sql), ps => new DBPreparedQuery(ps, context))
   }
 
-
-  def executeQuery(sql:String) : Future[DBResultList] = {
-    completeWithAkkaFuture[ResultSet,DBResultList](()=>connection.executeQuery(sql),rs=>new DBResultList(rs))
+  def prepareUpdate(sql: String): Future[DBPreparedUpdate] = {
+    completeWithAkkaFuture[PreparedUpdate, DBPreparedUpdate](
+      () => connection.prepareUpdate(sql), ps => new DBPreparedUpdate(ps, context))
   }
 
-  def executeUpdate(sql: String) :Future[Result] ={
-    completeWithAkkaFuture[Result,Result](()=>connection.executeUpdate(sql),rs=>rs)
+
+  def executeQuery(sql: String): Future[DBResultList] = {
+    completeWithAkkaFuture[ResultSet, DBResultList](() => connection.executeQuery(sql), rs => new DBResultList(rs))
   }
 
-  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>connection.close(),_=>())
+  def executeUpdate(sql: String): Future[DBResult] = {
+    completeWithAkkaFuture[Result, DBResult](() => connection.executeUpdate(sql), rs => new DBResult(rs))
+  }
+
+  def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => connection.close(), _ => ())
 
   def isClosed = connection.isClosed
 }
 
-class DBPreparedQuery(statement:PreparedQuery, implicit val context:ExecutionContext) extends FutureConversions{
-  def execute(args:Any*):Future[DBResultList] ={
-    val boxed = args.map(v=>v.asInstanceOf[AnyRef])
-    completeWithAkkaFuture[ResultSet,DBResultList](()=>statement.execute(boxed:_*),rs=>new DBResultList(rs))
+class DBPreparedQuery(statement: PreparedQuery, implicit val context: ExecutionContext) extends FutureConversions {
+  def execute(args: Any*): Future[DBResultList] = {
+    val boxed = args.map(v => v.asInstanceOf[AnyRef])
+    completeWithAkkaFuture[ResultSet, DBResultList](() => statement.execute(boxed: _*), rs => new DBResultList(rs))
   }
 
-  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>statement.close(),_=>())
+  def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => statement.close(), _ => ())
 }
-class DBPreparedUpdate(statement:PreparedUpdate, implicit val context:ExecutionContext) extends FutureConversions{
-  def execute(args:Any*):Future[DBResult] ={
-    val boxed = args.map(v=>v.asInstanceOf[AnyRef])
-    completeWithAkkaFuture[Result,DBResult](()=>statement.execute(boxed:_*),rs=>new DBResult(rs))
+
+class DBPreparedUpdate(statement: PreparedUpdate, implicit val context: ExecutionContext) extends FutureConversions {
+  def execute(args: Any*): Future[DBResult] = {
+    val boxed = args.map(v => v.asInstanceOf[AnyRef])
+    completeWithAkkaFuture[Result, DBResult](() => statement.execute(boxed: _*), rs => new DBResult(rs))
   }
 
-  def close():Future[Unit] =completeWithAkkaFuture[Void,Unit](()=>statement.close(),_=>())
+  def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => statement.close(), _ => ())
 }

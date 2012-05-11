@@ -46,7 +46,8 @@ class SpecBaseWithDB
     after{
       val truncateTable = for {
         connection <- Database(system).connect()
-        truncated <- connection.executeUpdate("TRUNCATE TABLE testTable")
+        _ <- connection.executeUpdate("TRUNCATE TABLE testTable")
+        truncated <- connection.executeUpdate("TRUNCATE TABLE insertTable")
         closed <- connection.close()
       } yield closed
       Await.ready(truncateTable, 5 seconds)

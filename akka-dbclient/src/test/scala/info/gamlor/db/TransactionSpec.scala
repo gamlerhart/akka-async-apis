@@ -8,44 +8,70 @@ import akka.dispatch.{Promise, Await}
  * @since 11.05.12
  */
 
-class TransactionSpec extends SpecBaseWithDB{
+class TransactionSpec extends SpecBaseWithDB {
 
   describe("Trasaction Support") {
-    it("can rollback transcation"){
-      val dbOperationResult= for {
+    it("can rollback transcation") {
+      val dbOperationResult = for {
         connection <- Database(system).connect()
         txBeforeBeginTx <- Promise.successful(connection.isInTransaction)
         _ <- connection.beginTransaction()
-        txAfterBeginTx <-  Promise.successful(connection.isInTransaction)
+        txAfterBeginTx <- Promise.successful(connection.isInTransaction)
         _ <- connection.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsRollback')")
         _ <- connection.rollback()
         dataAfterRollback <- connection.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsRollback'")
         _ <- connection.close()
-      } yield (txBeforeBeginTx,txAfterBeginTx,dataAfterRollback)
+      } yield (txBeforeBeginTx, txAfterBeginTx, dataAfterRollback)
 
-      val (txBeforeBeginTx,txAfterBeginTx,dataAfterRollback) = Await.result(dbOperationResult,5 seconds)
+      val (txBeforeBeginTx, txAfterBeginTx, dataAfterRollback) = Await.result(dbOperationResult, 5 seconds)
 
 
       txBeforeBeginTx must be(false)
       txAfterBeginTx must be(true)
       dataAfterRollback.size must be(0)
     }
-    it("can commit transcation"){
-      val dbOperationResult= for {
+    it("can commit transcation") {
+      val dbOperationResult = for {
         connection <- Database(system).connect()
         _ <- connection.beginTransaction()
-        _ <- connection.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsRollback')")
+        _ <- connection.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
         _ <- connection.commit()
-        dataAfterRollback <- connection.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsRollback'")
-        _ <- connection.executeUpdate("DELETE FROM insertTable WHERE data LIKE 'transactionsRollback'")
+        data <- connection.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit'")
         _ <- connection.close()
-      } yield (dataAfterRollback)
+      } yield (data)
 
-      val dataAfterCommit = Await.result(dbOperationResult,5 seconds)
+      val (dataAfterCommit) = Await.result(dbOperationResult, 5 seconds)
 
 
       dataAfterCommit.size must be(1)
     }
+
+  }
+  describe("The withTransaction operations") {
+    it("commits transaction") {
+      val con = Await.result(Database(system).connect(), 5 seconds)
+      val dataFuture =
+        con.withTransaction {
+          tx =>
+            val selectedData = for {
+              _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+              data <- tx.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit'")
+
+            } yield data
+            selectedData
+        }
+      val data = Await.result(dataFuture, 5 seconds)
+
+      data.size must be(1)
+      con.isInTransaction() must be(false)
+
+      val hasCommitted =  Await.result(con.executeQuery("SELECT FROM insertTable" +
+        " WHERE data LIKE 'transactionsCommit'"), 5 seconds)
+
+
+      hasCommitted.size must be(1)
+    }
+
   }
 
 }

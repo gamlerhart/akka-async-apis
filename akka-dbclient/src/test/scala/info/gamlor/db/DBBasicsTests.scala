@@ -60,7 +60,7 @@ class DBBasicsTests extends SpecBaseWithDB {
         create <- connection.executeUpdate("CREATE TABLE IF NOT EXISTS simpleTable (id INT)")
         insert <- connection.executeUpdate("INSERT INTO simpleTable VALUES(1)")
         closed <- connection.close()
-      } yield insert.getAffectedRows;
+      } yield insert.affectedRows;
 
       val createResult = Await.result(insertTable, 5 seconds)
       createResult must be(1L)
@@ -69,10 +69,10 @@ class DBBasicsTests extends SpecBaseWithDB {
         connection <- Database(system).connect()
         create <- connection.executeUpdate("DROP TABLE simpleTable")
         closed <- connection.close()
-      } yield create.getAffectedRows;
+      } yield create.affectedRows;
 
       val dropResult = Await.result(dropTable, 5 seconds)
-      assert(null!=dropResult)
+      assert(0<=dropResult)
     }
     it("can close connection") {
       val future = for {
