@@ -75,7 +75,7 @@ class DBBasicsTests extends SpecBaseWithDB {
       assert(null!=dropResult)
     }
     it("can close connection") {
-      var future = for {
+      val future = for {
         connection <- Database(system).connect()
         closeFuture <- connection.close()
       } yield connection;

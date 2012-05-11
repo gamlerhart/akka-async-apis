@@ -1,8 +1,8 @@
 package info.gamlor.db
 
 import scala.Predef._
-import akka.dispatch.{ExecutionContext, Future}
 import org.adbcj._
+import akka.dispatch.{Promise, ExecutionContext, Future}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -16,6 +16,23 @@ object DBConnection {
 }
 
 class DBConnection(val connection:Connection, implicit val context:ExecutionContext) extends FutureConversions{
+  def commit() : Future[Unit] ={
+      connection.commit()
+      Promise.successful[Unit]()
+    }
+
+  def beginTransaction() : Future[Unit] ={
+    connection.beginTransaction()
+    Promise.successful[Unit]()
+  }
+
+  def rollback() : Future[Unit] ={
+    connection.rollback()
+    Promise.successful[Unit]()
+  }
+
+  def isInTransaction() : Boolean = connection.isInTransaction
+
   def prepareQuery(sql: String) : Future[DBPreparedQuery] ={
     completeWithAkkaFuture[PreparedQuery,DBPreparedQuery](
       ()=>connection.prepareQuery(sql),ps=>new DBPreparedQuery(ps,context))
