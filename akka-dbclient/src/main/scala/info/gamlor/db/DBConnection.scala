@@ -111,6 +111,7 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
   def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => connection.close(), _ => ())
 
   def isClosed = connection.isClosed
+  def isOpen = connection.isOpen
 }
 
 class DBPreparedQuery(statement: PreparedQuery, implicit val context: ExecutionContext) extends FutureConversions {

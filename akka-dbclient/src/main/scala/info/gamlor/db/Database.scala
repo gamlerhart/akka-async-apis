@@ -1,8 +1,8 @@
 package info.gamlor.db
 
 import akka.actor.{ExtendedActorSystem, Extension, ExtensionIdProvider, ExtensionId}
-import akka.dispatch.{Future, ExecutionContext}
 import org.adbcj._
+import akka.dispatch.{Promise, Future, ExecutionContext}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -27,6 +27,26 @@ object Database
 class DatabaseAccess(val connectionManager: ConnectionManager,
                      implicit val context: ExecutionContext
                       ) extends Extension with FutureConversions {
+  def withConnection[T](operation: DBConnection => Future[T]): Future[T] = {
+    connect().flatMap(conn => {
+      val operationFuture = try {
+        operation(conn)
+      } catch {
+        case error: Throwable => {
+          conn.close().flatMap(u => Promise.failed(error))
+        }
+      }
+      operationFuture
+        .flatMap(result => conn.close().map(_ => result))
+        .recoverWith({
+        case error: Throwable => {
+          conn.close().flatMap(u => Promise.failed(error))
+        }
+      })
+    }
+
+    )
+  }
 
 
   /**

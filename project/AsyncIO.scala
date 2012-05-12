@@ -42,9 +42,8 @@ object AkkaAsyncModules extends Build  {
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
     resolvers += "Typesafe Repo" at "http://repo.typesafe.com/typesafe/releases/",
     resolvers += "Tools-Repo" at "http://scala-tools.org/repo-releases/",
-    resolvers +=  "Gamlor-Repo" at "https://github.com/gamlerhart/gamlor-mvn/raw/master/snapshots",
-//    resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/.m2/repository",
     resolvers +=  Resolver.file("Local Maven Repository", file(Path.userHome.absolutePath+"/.m2/repository")) transactional(),
+    resolvers +=  "Gamlor-Repo" at "https://github.com/gamlerhart/gamlor-mvn/raw/master/snapshots",
     // compile options
     scalacOptions ++= Seq("-encoding", "UTF-8", "-deprecation", "-unchecked","-optimize"),
     javacOptions ++= Seq("-source", "1.7", "-target", "1.7", "-Xlint:deprecation"),
@@ -64,8 +63,8 @@ object Dependencies {
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
 
-  val ajdbc = "org.adbcj" % "adbcj-api" % "0.3-SNAPSHOT"
-  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test"
+  val ajdbc = "org.adbcj" % "adbcj-api" % "0.3-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test" changing()
   val h2DBForTests = "com.h2database" % "h2" % "1.3.161" % "test"
 
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"

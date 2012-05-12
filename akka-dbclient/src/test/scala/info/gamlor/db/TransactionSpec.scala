@@ -99,13 +99,13 @@ class TransactionSpec extends SpecBaseWithDB {
             val selectedData = for {
               _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
               _ <- {
-                throw new Exception("Simulated error")
+                throw new SimulatedErrorException("Simulated error")
               }: Future[Unit]
 
             } yield ""
             selectedData
         }
-      intercept[Exception](Await.result(dataFuture, 5 seconds))
+      intercept[SimulatedErrorException](Await.result(dataFuture, 5 seconds))
 
       con.isInTransaction() must be(false)
 
@@ -157,7 +157,7 @@ class TransactionSpec extends SpecBaseWithDB {
           } yield ""
           selectedData
       }
-    intercept[Exception](Await.result(dataFuture, 5 seconds))
+    intercept[SimulatedErrorException](Await.result(dataFuture, 5 seconds))
 
     con.isInTransaction() must be(false)
 
@@ -186,7 +186,7 @@ class TransactionSpec extends SpecBaseWithDB {
 
   private def compositionCodeFailsInNestedTransaction(connection: DBConnection) = connection.withTransaction {
     tx => {
-      throw new Exception("Simulated error")
+      throw new SimulatedErrorException("Simulated error")
     }: Future[Unit]
   }
   private def futureFailsInNestedTransaction(connection: DBConnection) = connection.withTransaction {
