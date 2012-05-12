@@ -65,7 +65,7 @@ class TransactionSpec extends SpecBaseWithDB {
       data.size must be(1)
       con.isInTransaction() must be(false)
 
-      val hasCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      val hasCommitted = Await.result(con.executeQuery("SELECT * FROM insertTable" +
         " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
 
 
@@ -86,7 +86,7 @@ class TransactionSpec extends SpecBaseWithDB {
       Await.result(dataFuture, 5 seconds)
       con.isInTransaction() must be(false)
 
-      val hasNotCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      val hasNotCommitted = Await.result(con.executeQuery("SELECT * FROM insertTable" +
         " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
 
       hasNotCommitted.size must be(0)
@@ -100,7 +100,7 @@ class TransactionSpec extends SpecBaseWithDB {
               _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
               _ <- {
                 throw new Exception("Simulated error")
-              } : Future[Unit]
+              }: Future[Unit]
 
             } yield ""
             selectedData
@@ -109,7 +109,7 @@ class TransactionSpec extends SpecBaseWithDB {
 
       con.isInTransaction() must be(false)
 
-      val hasNotCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      val hasNotCommitted = Await.result(con.executeQuery("SELECT * FROM insertTable" +
         " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
 
       hasNotCommitted.size must be(0)
@@ -129,18 +129,68 @@ class TransactionSpec extends SpecBaseWithDB {
             stillInTransaction
         }
       val stillInTransaction = Await.result(dataFuture, 5 seconds)
-      stillInTransaction should be (true)
-      val hasCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      stillInTransaction should be(true)
+      val hasCommitted = Await.result(con.executeQuery("SELECT * FROM insertTable" +
         " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
       hasCommitted.size must be(3)
 
+    }
+    it("propagates error in nested transaction: composition code fails") {
+      failANestedTransaction(tx=> compositionCodeFailsInNestedTransaction(tx))
+    }
+    it("propagates error in nested transaction: future fails") {
+      failANestedTransaction(tx=> futureFailsInNestedTransaction(tx))
     }
 
   }
 
 
-  private def nestedInsert(connection:DBConnection) = connection.withTransaction {
-    tx =>tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+  private def failANestedTransaction(failureMode:DBConnection=>Future[Unit]) {
+    val con = Await.result(Database(system).connect(), 5 seconds)
+    val dataFuture =
+      con.withTransaction {
+        tx =>
+          val selectedData = for {
+            _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+            _ <- failureMode(tx)
+
+          } yield ""
+          selectedData
+      }
+    intercept[Exception](Await.result(dataFuture, 5 seconds))
+
+    con.isInTransaction() must be(false)
+
+    val hasNotCommitted = Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
+
+    hasNotCommitted.size must be(0)
+
+
+    Await.result(con.withTransaction {
+      tx =>
+        val selectedData = for {
+          _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('new-transaction-data')")
+        } yield ""
+        selectedData
+    }, 5 seconds)
+
+    val hasCommittedOnNextTx = Await.result(con.executeQuery("SELECT * FROM insertTable" +
+      " WHERE data LIKE 'new-transaction-data';"), 5 seconds)
+    hasCommittedOnNextTx.size must be(1)
+  }
+
+  private def nestedInsert(connection: DBConnection) = connection.withTransaction {
+    tx => tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+  }
+
+  private def compositionCodeFailsInNestedTransaction(connection: DBConnection) = connection.withTransaction {
+    tx => {
+      throw new Exception("Simulated error")
+    }: Future[Unit]
+  }
+  private def futureFailsInNestedTransaction(connection: DBConnection) = connection.withTransaction {
+    tx => Promise.failed(new Exception("Simulated error"))
   }
 
 

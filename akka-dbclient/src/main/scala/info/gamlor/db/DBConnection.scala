@@ -28,7 +28,8 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
 
   /**
    * Runs a transaction with this connection. The transaction is committed when the future which the given operation
-   * returns. In case you want to roll the transaction back you need to call .rollback()
+   * returns with a result. If the future carries an error, then the transaction is rolled back.
+   * You can manually roll the transaction back by calling .rollback()
    *
    * If a transaction is already running, it will be reused.
    *
@@ -41,8 +42,12 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
       connection.beginTransaction()
     }
     runnintInTransactions.incrementAndGet()
-    operation(this)
-      .flatMap(finishTransaction)
+    val operationResult = try {
+      operation(this)
+    } catch {
+      case anyError: Throwable => Promise.failed(anyError)
+    }
+    operationResult.flatMap(finishTransaction)
       .recoverWith[T]({
       case anyError: Throwable => failTransaction(anyError)
     })
