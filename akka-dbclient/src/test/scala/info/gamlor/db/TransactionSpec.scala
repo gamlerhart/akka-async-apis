@@ -91,7 +91,34 @@ class TransactionSpec extends SpecBaseWithDB {
 
       hasNotCommitted.size must be(0)
     }
+    it("can nest transaction") {
+      val con = Await.result(Database(system).connect(), 5 seconds)
+      val dataFuture =
+        con.withTransaction {
+          tx =>
+            val stillInTransaction = for {
+              _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+              _ <- nestedInsert(tx)
+              stillInTransaction <- Promise.successful(tx.isInTransaction())
+              _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+
+            } yield stillInTransaction
+            stillInTransaction
+        }
+      val stillInTransaction = Await.result(dataFuture, 5 seconds)
+      stillInTransaction should be (true)
+      val hasCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+        " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
+      hasCommitted.size must be(3)
+
+    }
 
   }
+
+
+  private def nestedInsert(connection:DBConnection) = connection.withTransaction {
+    tx =>tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+  }
+
 
 }

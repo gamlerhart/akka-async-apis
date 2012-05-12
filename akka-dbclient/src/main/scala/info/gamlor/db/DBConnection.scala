@@ -3,6 +3,7 @@ package info.gamlor.db
 import scala.Predef._
 import org.adbcj._
 import akka.dispatch.{Future, Promise, ExecutionContext}
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -16,7 +17,7 @@ object DBConnection {
 }
 
 class DBConnection(val connection: Connection, implicit val context: ExecutionContext) extends FutureConversions {
-
+  private val runnintInTransactions = new AtomicInteger()
   /**
    * Runs a transaction with this connection. The transaction is committed when the future which the given operation
    * returns. In case you want to roll the transaction back you need to call .rollback()
@@ -31,13 +32,17 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
     if (!connection.isInTransaction) {
       connection.beginTransaction()
     }
+    runnintInTransactions.incrementAndGet()
     for{
       txOperation <- operation(this)
-      closeOperation <- if (connection.isInTransaction) {
+      closeOperation <- {
+        runnintInTransactions.decrementAndGet()
+        if (connection.isInTransaction && runnintInTransactions.get()==0) {
           commit()
         } else {
           Promise.successful[Unit]()
         }
+      }
     } yield txOperation
   }
 
