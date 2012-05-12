@@ -2,8 +2,8 @@ package info.gamlor.db
 
 import scala.Predef._
 import org.adbcj._
-import akka.dispatch.{Future, Promise, ExecutionContext}
 import java.util.concurrent.atomic.AtomicInteger
+import akka.dispatch.{Future, Promise, ExecutionContext}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -16,8 +16,16 @@ object DBConnection {
 
 }
 
+/**
+ * Represents a connection to the database.
+ *
+ *
+ * @param connection the underlying connection
+ * @param context execution context which is used for dispatching results
+ */
 class DBConnection(val connection: Connection, implicit val context: ExecutionContext) extends FutureConversions {
   private val runnintInTransactions = new AtomicInteger()
+
   /**
    * Runs a transaction with this connection. The transaction is committed when the future which the given operation
    * returns. In case you want to roll the transaction back you need to call .rollback()
@@ -33,17 +41,30 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
       connection.beginTransaction()
     }
     runnintInTransactions.incrementAndGet()
-    for{
-      txOperation <- operation(this)
-      closeOperation <- {
-        runnintInTransactions.decrementAndGet()
-        if (connection.isInTransaction && runnintInTransactions.get()==0) {
-          commit()
-        } else {
-          Promise.successful[Unit]()
-        }
-      }
-    } yield txOperation
+    operation(this)
+      .flatMap(finishTransaction)
+      .recoverWith[T]({
+      case anyError: Throwable => failTransaction(anyError)
+    })
+  }
+
+
+  private def finishTransaction[T](valueToReturn: T): Future[T] = {
+    runnintInTransactions.decrementAndGet()
+    if (connection.isInTransaction && runnintInTransactions.get() == 0) {
+      commit().map(u => valueToReturn)
+    } else {
+      Promise.successful(valueToReturn)
+    }
+  }
+
+  private def failTransaction[T](error: Throwable): Future[T] = {
+    runnintInTransactions.decrementAndGet()
+    if (connection.isInTransaction && runnintInTransactions.get() == 0) {
+      rollback().flatMap(u => Promise.failed(error))
+    } else {
+      Promise.failed(error)
+    }
   }
 
   def commit(): Future[Unit] = {

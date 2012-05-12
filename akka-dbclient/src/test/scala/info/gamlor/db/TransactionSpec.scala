@@ -1,7 +1,7 @@
 package info.gamlor.db
 
 import akka.util.duration._
-import akka.dispatch.{Promise, Await}
+import akka.dispatch.{Future, Promise, Await}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -84,6 +84,29 @@ class TransactionSpec extends SpecBaseWithDB {
             selectedData
         }
       Await.result(dataFuture, 5 seconds)
+      con.isInTransaction() must be(false)
+
+      val hasNotCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+        " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
+
+      hasNotCommitted.size must be(0)
+    }
+    it("propagates error and rolls back") {
+      val con = Await.result(Database(system).connect(), 5 seconds)
+      val dataFuture =
+        con.withTransaction {
+          tx =>
+            val selectedData = for {
+              _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+              _ <- {
+                throw new Exception("Simulated error")
+              } : Future[Unit]
+
+            } yield ""
+            selectedData
+        }
+      intercept[Exception](Await.result(dataFuture, 5 seconds))
+
       con.isInTransaction() must be(false)
 
       val hasNotCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
