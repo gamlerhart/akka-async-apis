@@ -190,7 +190,7 @@ class TransactionSpec extends SpecBaseWithDB {
     }: Future[Unit]
   }
   private def futureFailsInNestedTransaction(connection: DBConnection) = connection.withTransaction {
-    tx => Promise.failed(new Exception("Simulated error"))
+    tx => Promise.failed(new SimulatedErrorException("Simulated error"))
   }
 
 
