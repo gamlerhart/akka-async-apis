@@ -36,7 +36,7 @@ class TransactionSpec extends SpecBaseWithDB {
         _ <- connection.beginTransaction()
         _ <- connection.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
         _ <- connection.commit()
-        data <- connection.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit'")
+        data <- connection.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit';")
         _ <- connection.close()
       } yield (data)
 
@@ -55,7 +55,7 @@ class TransactionSpec extends SpecBaseWithDB {
           tx =>
             val selectedData = for {
               _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
-              data <- tx.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit'")
+              data <- tx.executeQuery("SELECT * FROM insertTable WHERE data LIKE 'transactionsCommit';")
 
             } yield data
             selectedData
@@ -65,8 +65,8 @@ class TransactionSpec extends SpecBaseWithDB {
       data.size must be(1)
       con.isInTransaction() must be(false)
 
-      val hasCommitted =  Await.result(con.executeQuery("SELECT FROM insertTable" +
-        " WHERE data LIKE 'transactionsCommit'"), 5 seconds)
+      val hasCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+        " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
 
 
       hasCommitted.size must be(1)
