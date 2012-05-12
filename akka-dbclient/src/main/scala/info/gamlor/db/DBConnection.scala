@@ -33,7 +33,11 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
     }
     for{
       txOperation <- operation(this)
-      closeOperation <- commit()
+      closeOperation <- if (connection.isInTransaction) {
+          commit()
+        } else {
+          Promise.successful[Unit]()
+        }
     } yield txOperation
   }
 

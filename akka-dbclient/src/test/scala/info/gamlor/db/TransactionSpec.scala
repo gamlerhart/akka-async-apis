@@ -71,6 +71,26 @@ class TransactionSpec extends SpecBaseWithDB {
 
       hasCommitted.size must be(1)
     }
+    it("rollbacks transaction") {
+      val con = Await.result(Database(system).connect(), 5 seconds)
+      val dataFuture =
+        con.withTransaction {
+          tx =>
+            val selectedData = for {
+              _ <- tx.executeUpdate("INSERT INTO insertTable(data) VALUES('transactionsCommit')")
+              _ <- tx.rollback()
+
+            } yield ""
+            selectedData
+        }
+      Await.result(dataFuture, 5 seconds)
+      con.isInTransaction() must be(false)
+
+      val hasNotCommitted =  Await.result(con.executeQuery("SELECT * FROM insertTable" +
+        " WHERE data LIKE 'transactionsCommit';"), 5 seconds)
+
+      hasNotCommitted.size must be(0)
+    }
 
   }
 
