@@ -4,6 +4,8 @@ import scala.Predef._
 import org.adbcj._
 import java.util.concurrent.atomic.AtomicInteger
 import akka.dispatch.{Future, Promise, ExecutionContext}
+import info.gamlor.db.DBResults._
+import scala.PartialFunction
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -103,10 +105,16 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
   def executeQuery(sql: String): Future[DBResultList] = {
     completeWithAkkaFuture[ResultSet, DBResultList](() => connection.executeQuery(sql), rs => new DBResultList(rs))
   }
+
   def executeQuery[T](sql: String,
-                   eventHandler: ResultEventHandler[T],
-                   accumulator: T): Future[T] = {
-    completeWithAkkaFuture[T, T](() => connection.executeQuery(sql,eventHandler,accumulator), rs => rs)
+                      eventHandler: ResultHandler[T],
+                      accumulator: T): Future[T] = {
+    completeWithAkkaFuture[T, T](() => connection.executeQuery(sql, eventHandler, accumulator), rs => rs)
+  }
+
+  def executeQuery[T](sql: String, initialValue: T)(eventHandler: PartialFunction[DBResultEvents[T], T]): Future[T] = {
+    completeWithAkkaFuture[MutableRef[T], T](() => connection.executeQuery(sql,
+      new PatternMatchResultHandler(eventHandler), new MutableRef(initialValue)), rs => rs.value)
   }
 
   def executeUpdate(sql: String): Future[DBResult] = {
@@ -116,7 +124,56 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
   def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => connection.close(), _ => ())
 
   def isClosed = connection.isClosed
+
   def isOpen = connection.isOpen
+
+}
+
+private[db] class MutableRef[T](var value: T)
+
+private[db] class PatternMatchResultHandler[T](pf: PartialFunction[DBResultEvents[T], T]) extends ResultHandler[MutableRef[T]] {
+  def exception(t: Throwable, accumulator: MutableRef[T]) {
+    processMessage(Error(t, accumulator.value), accumulator)
+  }
+
+  def startRow(accumulator: MutableRef[T]) {
+    processMessage(StartRow(accumulator.value), accumulator)
+  }
+
+  def startFields(accumulator: MutableRef[T]) {
+    processMessage(StartFields(accumulator.value), accumulator)
+  }
+
+  def endResults(accumulator: MutableRef[T]) {
+    processMessage(EndResults(accumulator.value), accumulator)
+  }
+
+  def endFields(accumulator: MutableRef[T]) {
+    processMessage(EndFields(accumulator.value), accumulator)
+  }
+
+  def value(value: Value, accumulator: MutableRef[T]) {
+    processMessage(AValue(value, accumulator.value), accumulator)
+  }
+
+  def field(field: Field, accumulator: MutableRef[T]) {
+    processMessage(AField(field, accumulator.value), accumulator)
+  }
+
+  def startResults(accumulator: MutableRef[T]) {
+    processMessage(StartResults(accumulator.value), accumulator)
+  }
+
+  def endRow(accumulator: MutableRef[T]) {
+    processMessage(EndRow(accumulator.value), accumulator)
+  }
+
+
+  private def processMessage(eventInfo: DBResults.DBResultEvents[T], accumulator: MutableRef[T]) {
+    if (pf.isDefinedAt(eventInfo)) {
+      accumulator.value = pf(eventInfo);
+    }
+  }
 }
 
 class DBPreparedQuery(statement: PreparedQuery, implicit val context: ExecutionContext) extends FutureConversions {
@@ -125,10 +182,16 @@ class DBPreparedQuery(statement: PreparedQuery, implicit val context: ExecutionC
     completeWithAkkaFuture[ResultSet, DBResultList](() => statement.execute(boxed: _*), rs => new DBResultList(rs))
   }
 
-  def executeWithCallback[T](eventHandler : ResultEventHandler[T],
-                          accumulator : T, params : AnyRef*) : Future[T] = {
+  def executeWithCallbackObject[T](eventHandler: ResultHandler[T],
+                             accumulator: T, params: Any*): Future[T] = {
     val boxed = params.map(v => v.asInstanceOf[AnyRef])
-    completeWithAkkaFuture[T, T](() => statement.executeWithCallback(eventHandler,accumulator,boxed: _*), rs => rs)
+    completeWithAkkaFuture[T, T](() => statement.executeWithCallback(eventHandler, accumulator, boxed: _*), rs => rs)
+  }
+
+  def executeWithCallback[T](initialValue: T, params: Any*) (eventHandler: PartialFunction[DBResultEvents[T], T]) = {
+    val boxed = params.map(v => v.asInstanceOf[AnyRef])
+    completeWithAkkaFuture[MutableRef[T], T](() => statement.executeWithCallback(new PatternMatchResultHandler[T](eventHandler),
+      new MutableRef(initialValue), boxed: _*), rs => rs.value)
   }
 
   def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => statement.close(), _ => ())

@@ -2,7 +2,8 @@ package info.gamlor.db
 
 import akka.dispatch.Await
 import akka.util.duration._
-import org.adbcj.{Value, AbstractEventHandler}
+import org.adbcj.{Value, AbstractResultHandler}
+import info.gamlor.db.DBResults._
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -108,7 +109,8 @@ class QueryTestCases extends SpecBaseWithDB {
     }
     it("can use java like callback class") {
       val resultFuture = for {connection <- Database(system).connect()
-           result <- connection.executeQuery("SELECT firstname FROM testTable WHERE firstname LIKE 'Roman'",new AbstractEventHandler[StringBuilder] {
+           result <- connection.executeQuery("SELECT firstname FROM testTable WHERE firstname LIKE 'Roman'",
+             new AbstractResultHandler[StringBuilder] {
              override def value(value: Value, accumulator: StringBuilder) {
                accumulator.append(value.getString)
              }
@@ -118,6 +120,25 @@ class QueryTestCases extends SpecBaseWithDB {
       val result = Await.result(resultFuture, 5 seconds)
 
       result.toString must be("Roman")
+
+    }
+    it("can use callback with pattern matching") {
+      val resultFuture = for {connection <- Database(system).connect()
+           result <- connection.executeQuery("SELECT firstname FROM testTable WHERE firstname LIKE 'Roman'",""){
+             case StartFields(data) =>data + "StartFields-"
+             case AField(fieldInfo,data) =>data +"AField(" + fieldInfo.getColumnLabel.toLowerCase + ")-"
+             case EndFields(data) =>data + "EndField-"
+             case StartResults(data) =>data + "StartResults-"
+             case StartRow(data) =>data + "StartRow-"
+             case AValue(value,data) =>data +"AValue(" + value.getString + ")-"
+             case EndRow(data) =>data +"EndRow-"
+             case EndResults(data) =>data +"EndResults"
+           }
+           closed <- connection.close()
+      } yield result
+      val result = Await.result(resultFuture, 5 seconds)
+
+      result.toString must be("StartFields-AField(firstname)-EndField-StartResults-StartRow-AValue(Roman)-EndRow-EndResults")
 
     }
 
