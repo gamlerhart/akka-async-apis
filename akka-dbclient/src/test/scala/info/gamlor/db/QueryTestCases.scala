@@ -2,6 +2,7 @@ package info.gamlor.db
 
 import akka.dispatch.Await
 import akka.util.duration._
+import org.adbcj.{Value, AbstractEventHandler}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -103,6 +104,20 @@ class QueryTestCases extends SpecBaseWithDB {
       result.size must be(2)
       result.get(0).get("bornInYear").getString must be("1990")
       result.get(1).get("bornInYear").getString must be("1986")
+
+    }
+    it("can use java like callback class") {
+      val resultFuture = for {connection <- Database(system).connect()
+           result <- connection.executeQuery("SELECT firstname FROM testTable WHERE firstname LIKE 'Roman'",new AbstractEventHandler[StringBuilder] {
+             override def value(value: Value, accumulator: StringBuilder) {
+               accumulator.append(value.getString)
+             }
+           }, new StringBuilder())
+           closed <- connection.close()
+      } yield result
+      val result = Await.result(resultFuture, 5 seconds)
+
+      result.toString must be("Roman")
 
     }
 

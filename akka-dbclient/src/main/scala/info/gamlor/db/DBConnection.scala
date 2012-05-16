@@ -103,6 +103,11 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
   def executeQuery(sql: String): Future[DBResultList] = {
     completeWithAkkaFuture[ResultSet, DBResultList](() => connection.executeQuery(sql), rs => new DBResultList(rs))
   }
+  def executeQuery[T](sql: String,
+                   eventHandler: ResultEventHandler[T],
+                   accumulator: T): Future[T] = {
+    completeWithAkkaFuture[T, T](() => connection.executeQuery(sql,eventHandler,accumulator), rs => rs)
+  }
 
   def executeUpdate(sql: String): Future[DBResult] = {
     completeWithAkkaFuture[Result, DBResult](() => connection.executeUpdate(sql), rs => new DBResult(rs))

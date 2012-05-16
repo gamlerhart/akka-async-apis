@@ -72,7 +72,7 @@ class PreparedQueriesSpec extends SpecBaseWithDB with BeforeAndAfter {
     it("can use java like callback class") {
       val future = for {
         connection <- Database(system).connect()
-        statement <- connection.prepareQuery(" SELECT firstname FROM testTable WHERE firstname LIKE ? " )
+        statement <- connection.prepareQuery("SELECT firstname FROM testTable WHERE firstname LIKE ? " )
         result <- statement.executeWithCallback(new AbstractEventHandler[StringBuilder] {
           override def value(value: Value, accumulator: StringBuilder) {
             accumulator.append(value.getString)

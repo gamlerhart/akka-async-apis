@@ -33,7 +33,7 @@ class DBBasicsTests extends SpecBaseWithDB {
       result.value.get.isLeft must be(true)
     }
     it("can select 1") {
-      var selectedOne = for {
+      val selectedOne = for {
         connection <- Database(system).connect()
         r <- connection.executeQuery("SELECT 1 As count")
 
@@ -44,7 +44,7 @@ class DBBasicsTests extends SpecBaseWithDB {
       result must be(1)
     }
     it("fail with invalid select") {
-      var selectedOne = for {
+      val selectedOne = for {
         connection <- Database(system).connect()
         r <- connection.executeQuery("SELECT this is  Not Valid, or is it?")
 
