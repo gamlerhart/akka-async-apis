@@ -3,7 +3,7 @@ package info.gamlor.db
 import org.scalatest.BeforeAndAfter
 import akka.dispatch.Await
 import akka.util.duration._
-import org.adbcj.DbException
+import org.adbcj.{Value, AbstractEventHandler, DbException}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -68,6 +68,22 @@ class PreparedQueriesSpec extends SpecBaseWithDB with BeforeAndAfter {
 
       intercept[DbException](Await.result(future, 5 seconds))
 
+    }
+    it("can use java like callback class") {
+      val future = for {
+        connection <- Database(system).connect()
+        statement <- connection.prepareQuery(" SELECT firstname FROM testTable WHERE firstname LIKE ? " )
+        result <- statement.executeWithCallback(new AbstractEventHandler[StringBuilder] {
+          override def value(value: Value, accumulator: StringBuilder) {
+            accumulator.append(value.getString)
+          }
+        }, new StringBuilder(),"Roman")
+        _ <- connection.close()
+      } yield result
+
+      val result = Await.result(future, 5 seconds)
+
+      result.toString() must be("Roman")
     }
   }
 

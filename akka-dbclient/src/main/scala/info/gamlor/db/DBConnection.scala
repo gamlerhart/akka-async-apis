@@ -115,9 +115,15 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
 }
 
 class DBPreparedQuery(statement: PreparedQuery, implicit val context: ExecutionContext) extends FutureConversions {
-  def execute(args: Any*): Future[DBResultList] = {
-    val boxed = args.map(v => v.asInstanceOf[AnyRef])
+  def execute(params: Any*): Future[DBResultList] = {
+    val boxed = params.map(v => v.asInstanceOf[AnyRef])
     completeWithAkkaFuture[ResultSet, DBResultList](() => statement.execute(boxed: _*), rs => new DBResultList(rs))
+  }
+
+  def executeWithCallback[T](eventHandler : ResultEventHandler[T],
+                          accumulator : T, params : AnyRef*) : Future[T] = {
+    val boxed = params.map(v => v.asInstanceOf[AnyRef])
+    completeWithAkkaFuture[T, T](() => statement.executeWithCallback(eventHandler,accumulator,boxed: _*), rs => rs)
   }
 
   def close(): Future[Unit] = completeWithAkkaFuture[Void, Unit](() => statement.close(), _ => ())
