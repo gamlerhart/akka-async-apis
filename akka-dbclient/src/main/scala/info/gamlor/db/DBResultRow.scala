@@ -30,9 +30,14 @@ class DBResultRow(val row: Row) extends Seq[Value]{
   }
 
   private def getFieldByName(fieldName:String) = {
-    row.getResultSet.getField(fieldName.toUpperCase) match{
+    row.getResultSet.getField(fieldName) match{
       case f:Field => f
-      case null => throw new IllegalArgumentException("Field '"+fieldName+"' does not exist")
+      case null => {
+        row.getResultSet.getField(fieldName.toUpperCase) match {
+          case f:Field => f
+          case null => throw new IllegalArgumentException("Field '"+fieldName+"' does not exist")
+        }
+      }
     }
   }
 }
