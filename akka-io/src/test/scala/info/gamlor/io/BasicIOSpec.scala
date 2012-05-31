@@ -23,7 +23,7 @@ class BasicIOSpec extends SpecBase {
       val size = file.size()
       size must be(11)
 
-      val allContentFuture = file.read(0, size.toInt);
+      val allContentFuture = file.read(0, size.toInt)
 
       val content = Await.result(allContentFuture, 5 seconds)
       content.utf8String must be("Hello World")

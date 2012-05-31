@@ -380,7 +380,7 @@ trait AccumulationReadingBase extends FileIO{
           var (parsedValue, rest) = currentIteratee(input)
           while (parsedValue.isInstanceOf[IO.Done[A]]) {
             buffer.add(parsedValue.get)
-            var (newParsedValue, newRest) = parser(rest)
+            val (newParsedValue, newRest) = parser(rest)
             parsedValue = newParsedValue
             rest = newRest
           }
