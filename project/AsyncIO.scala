@@ -13,7 +13,7 @@ object AkkaAsyncModules extends Build  {
     publishTo := Some(Resolver.file("file",  new File( "C:\\Users\\Gamlor\\Develop\\gamlor-mvn\\snapshots" )) )
   )
 
-  lazy val root = Project("akka-async-modules", file(".")) aggregate(akkaIO, akkaWebClient, akkaDBClient)
+  lazy val root = Project("akka-async-modules", file(".")) aggregate(akkaIO, akkaWebClient, akkaDBClient,simpleBench)
 
   lazy val akkaIO: Project = Project(
     id = "akka-io",
@@ -34,6 +34,13 @@ object AkkaAsyncModules extends Build  {
     settings = defaultSettings ++ Seq(
       libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, ajdbc,ajdbcJdbcBridgeForTests,h2DBForTests,loggingBinding)
     )) dependsOn (akkaIO)
+
+  lazy val simpleBench: Project = Project(
+    id = "simple-benchmark",
+    base = file("./simple-benchmark"),
+    settings = defaultSettings ++ Seq(
+      libraryDependencies ++= Seq(akkaActors, mysqlForBenchmark,ajdbcJdbcBridgeForBenchmark,mysqlForBenchmark)
+    )) dependsOn (akkaDBClient)
 
 
 
@@ -66,6 +73,11 @@ object Dependencies {
   val ajdbc = "org.adbcj" % "adbcj-api" % "0.3-SNAPSHOT" changing()
   val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test" changing()
   val h2DBForTests = "com.h2database" % "h2" % "1.3.161" % "test"
+
+
+  val ajdbcForBenchmark = "org.adbcj" % "mysql-async-driver" % "0.3-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test" changing()
+  val mysqlForBenchmark = "mysql" % "mysql-connector-java" % "5.1.20"
 
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"
 
