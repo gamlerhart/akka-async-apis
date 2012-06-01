@@ -72,11 +72,15 @@ class FileChannelIO(val channel: AsynchronousFileChannel,
     promise
   }
 
+  // Hard to choose the perfect buffer size.
+  // But 32K seems resonable: http://stackoverflow.com/questions/236861/how-do-you-determine-the-ideal-buffer-size-when-using-fileinputstream
+  val DEFAULT_BUFFER_SIZE_USED = 32 * 1024
+
   class ContinuesReader[A](private var readPosition: Long,
                            private var amountStillToRead: Long,
                            private val resultAccumulator: Accumulator[A]
                             ) extends CompletionHandler[java.lang.Integer, ContinuesReader[A]] {
-    val stepSize = min(64 * 1024, amountStillToRead).toInt;
+    val stepSize = min(DEFAULT_BUFFER_SIZE_USED, amountStillToRead).toInt;
     private val readBuffer = ByteBuffer.allocate(stepSize)
     private val promiseToComplete: Promise[A] = Promise[A]()
 
