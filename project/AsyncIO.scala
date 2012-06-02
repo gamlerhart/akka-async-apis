@@ -19,12 +19,14 @@ object AkkaAsyncModules extends Build  {
     id = "akka-io",
     base = file("./akka-io"),
     settings = defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, mockito)
     ))
   lazy val akkaWebClient: Project = Project(
     id = "akka-webclient",
     base = file("./akka-webclient"),
     settings = defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= Seq(akkaActors,httpLib, scalaTest, akkaTestKit, mockito,simpleTestServer)
     ))dependsOn (akkaIO % "test->test")
 
@@ -32,6 +34,7 @@ object AkkaAsyncModules extends Build  {
     id = "akka-dbclient",
     base = file("./akka-dbclient"),
     settings = defaultSettings ++ Seq(
+      parallelExecution in Test := false,
       libraryDependencies ++= Seq(akkaActors, scalaTest, akkaTestKit, ajdbc,ajdbcJdbcBridgeForTests,h2DBForTests,loggingBinding)
     )) dependsOn (akkaIO)
 
@@ -39,7 +42,7 @@ object AkkaAsyncModules extends Build  {
     id = "simple-benchmark",
     base = file("./simple-benchmark"),
     settings = defaultSettings ++ Seq(
-      libraryDependencies ++= Seq(akkaActors, mysqlForBenchmark,ajdbcJdbcBridgeForBenchmark,mysqlForBenchmark)
+      libraryDependencies ++= Seq(akkaActors, mysqlForBenchmark,ajdbcJdbcBridgeForBenchmark,ajdbcMySQL,mysqlForBenchmark,netty,lsf4j)
     )) dependsOn (akkaDBClient)
 
 
@@ -70,13 +73,16 @@ object Dependencies {
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
 
-  val ajdbc = "org.adbcj" % "adbcj-api" % "0.3-SNAPSHOT" changing()
-  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test" changing()
+  val ajdbc = "org.adbcj" % "adbcj-api" % "0.3.1-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3.1-SNAPSHOT" % "test" changing()
   val h2DBForTests = "com.h2database" % "h2" % "1.3.161" % "test"
 
 
-  val ajdbcForBenchmark = "org.adbcj" % "mysql-async-driver" % "0.3-SNAPSHOT" changing()
-  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.3-SNAPSHOT" % "test" changing()
+  val ajdbcForBenchmark = "org.adbcj" % "mysql-async-driver" % "0.3.1-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.3.1-SNAPSHOT"  changing()
+  val ajdbcMySQL= "org.adbcj" % "mysql-async-driver" % "0.3.1-SNAPSHOT"  changing()
+  val netty= "io.netty" % "netty" % "3.3.1.Final"
+  val lsf4j= "org.slf4j" % "slf4j-api" % "1.6.2"
   val mysqlForBenchmark = "mysql" % "mysql-connector-java" % "5.1.20"
 
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"

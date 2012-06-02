@@ -3,6 +3,8 @@ package info.gamlor.db
 import akka.actor.{ExtendedActorSystem, Extension, ExtensionIdProvider, ExtensionId}
 import org.adbcj._
 import akka.dispatch.{Promise, Future, ExecutionContext}
+import collection.immutable.HashMap
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils.Collections
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -17,7 +19,11 @@ object Database
   override def createExtension(system: ExtendedActorSystem) = {
     val config = DatabaseSettings(system.settings.config)
     val connectionManager =
-      ConnectionManagerProvider.createConnectionManager(config.url, config.userName, config.passWord)
+      ConnectionManagerProvider.createConnectionManager(config.url,
+        config.userName,
+        config.passWord,
+        java.util.Collections.emptyMap(),
+        new info.gamlor.io.DelegateToContext(system.dispatcher))
     val client = new DatabaseAccess(connectionManager, system.dispatcher)
     client
   }

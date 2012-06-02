@@ -5,6 +5,7 @@ import akka.util.duration._
 import info.gamlor.db.{DBConnection, Database}
 import akka.dispatch.{Await, Future}
 import com.typesafe.config.ConfigFactory
+import util.Random
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -94,31 +95,47 @@ object WorstBenchmarkInTheWorld extends App {
   }
 
 
-}
+  class RequestSender extends Actor {
+    private var requestsPerSecond = 20;
+    private var rnd = new Random()
 
+    override def preStart() {
+      context.system.scheduler.schedule(1 seconds, 1 seconds, self, NewRequest)
+      context.system.scheduler.schedule(30 seconds, 30 seconds, self, IncreaseRequestPerSecond)
+    }
 
-class RequestSender extends Actor {
+    protected def receive = {
+      case NewRequest => {
+        val requests = pickSomeUsers()
 
-
-  override def preStart() {
-    context.system.scheduler.schedule(1 seconds, 50 seconds, self, NewRequest)
-  }
-
-  protected def receive = {
-    case NewRequest => {
+      }
+      case IncreaseRequestPerSecond => {
+        requestsPerSecond = requestsPerSecond + 10
+      }
 
     }
 
+    private def pickSomeUsers() = {
+      for (times <- 1 to requestsPerSecond) yield "UserNo " + rnd.nextInt(AmountOfUsers)
+    }
+
+
+    case object NewRequest
+    case object IncreaseRequestPerSecond
+
   }
 
-
-  case object NewRequest
 
 }
 
 
-class Request {
+
+
+class Request(user: String) {
   val startTime = System.currentTimeMillis()
+
+
+
 
 
 }
