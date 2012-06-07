@@ -42,7 +42,15 @@ object AkkaAsyncModules extends Build  {
     id = "simple-benchmark",
     base = file("./simple-benchmark"),
     settings = defaultSettings ++ Seq(
-      libraryDependencies ++= Seq(akkaActors, mysqlForBenchmark,ajdbcJdbcBridgeForBenchmark,ajdbcMySQL,mysqlForBenchmark,netty,lsf4j)
+      libraryDependencies ++= Seq(akkaActors,
+        mysqlForBenchmark,
+        ajdbc,
+        ajdbcJdbcBridgeForBenchmark,
+        ajdbcMySQL,
+        mysqlForBenchmark,
+        netty,
+        bonecp,
+        lsf4j)
     )) dependsOn (akkaDBClient)
 
 
@@ -84,6 +92,7 @@ object Dependencies {
   val netty= "io.netty" % "netty" % "3.3.1.Final"
   val lsf4j= "org.slf4j" % "slf4j-api" % "1.6.2"
   val mysqlForBenchmark = "mysql" % "mysql-connector-java" % "5.1.20"
+  val bonecp = "com.jolbox" % "bonecp" % "0.7.1.RELEASE"
 
   val httpLib = "com.ning" %"async-http-client"% "1.7.0"
 

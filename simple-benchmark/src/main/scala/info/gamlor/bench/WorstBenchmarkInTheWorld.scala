@@ -1,11 +1,12 @@
 package info.gamlor.bench
 
-import akka.actor.{Actor, ActorSystem}
 import akka.util.duration._
-import info.gamlor.db.{DBConnection, Database}
 import akka.dispatch.{Await, Future}
 import com.typesafe.config.ConfigFactory
 import util.Random
+import akka.actor.{Props, Actor, ActorSystem}
+import akka.routing.BroadcastRouter
+import info.gamlor.db.{DatabaseAccess, DBConnection, Database}
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -14,29 +15,51 @@ import util.Random
 object WorstBenchmarkInTheWorld extends App {
   private val AmountOfUsers = 20000
 
-  implicit val akkaSystem = ActorSystem("benchmark",ConfigFactory.load().getConfig("benchmark"))
+  implicit val akkaSystem = ActorSystem("benchmark", ConfigFactory.load().getConfig("benchmark"))
 
   main()
 
-  def main() {
-    val setupFuture = setup()
 
-    Await.result(setupFuture,10 minutes)
-    println("Done")
+  def main() {
+
+    //    val requestFullFiller = new NullFullfiller(akkaSystem)
+    val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
+    val setupFuture = setup(requestFullFiller.dbSupport)
+
+    Await.result(setupFuture, 10 minutes)
+    println("Setup Done")
+
+
+    runBenchmark(requestFullFiller)
+
+    Thread.sleep(60000)
+    Thread.sleep(60000)
+
+    println(">>>>>>>>>>>>>>>>>Done?>>>>>>>>>")
+    Thread.sleep(1000)
+
 
   }
 
-  def setup() : Future[Unit]= {
+  def setup(dbAccess:DatabaseAccess): Future[Unit] = {
 
-    Database(akkaSystem).withConnection {
+    dbAccess.withConnection {
       conn => {
-       for{
-         _ <-createSchema(conn)
-         _ <-insertUsersAndPosts(conn)
-      } yield ()
-    }
+        for {
+          _ <- createSchema(conn)
+          _ <- insertUsersAndPosts(conn)
+        } yield ()
+      }
 
-  }}
+    }
+  }
+
+  def runBenchmark(requestFullFiller:RequestFullfiller) {
+    val loadCreators = akkaSystem.actorOf(Props(new RequestSender(requestFullFiller)).withRouter(BroadcastRouter(30)))
+
+
+    loadCreators ! Start
+  }
 
 
   private def createSchema(conn: DBConnection): Future[String] =
@@ -95,33 +118,68 @@ object WorstBenchmarkInTheWorld extends App {
   }
 
 
-  class RequestSender extends Actor {
-    private var requestsPerSecond = 20;
-    private var rnd = new Random()
+  class RequestSender(tweetSystem: RequestFullfiller) extends Actor {
+    private var amountOfRounds = 60
+    private val rnd = new Random()
 
     override def preStart() {
-      context.system.scheduler.schedule(1 seconds, 1 seconds, self, NewRequest)
-      context.system.scheduler.schedule(30 seconds, 30 seconds, self, IncreaseRequestPerSecond)
     }
 
     protected def receive = {
       case NewRequest => {
-        val requests = pickSomeUsers()
+        val user = pickSomeUsers()
+        new Request(user, tweetSystem).run()
+        amountOfRounds = amountOfRounds - 1
 
+        if (amountOfRounds > 0) {
+          context.system.scheduler.scheduleOnce(950 + rnd.nextInt(100) millis, self, NewRequest)
+        } else {
+          context.stop(self)
+        }
       }
-      case IncreaseRequestPerSecond => {
-        requestsPerSecond = requestsPerSecond + 10
+      case Start => {
+        context.system.scheduler.scheduleOnce(rnd.nextInt(1000) millis, self, NewRequest)
       }
 
     }
 
     private def pickSomeUsers() = {
-      for (times <- 1 to requestsPerSecond) yield "UserNo " + rnd.nextInt(AmountOfUsers)
+      "UserNo " + rnd.nextInt(AmountOfUsers)
     }
 
 
     case object NewRequest
-    case object IncreaseRequestPerSecond
+
+  }
+
+  class Request(userName: String, tweetSystem: RequestFullfiller) {
+    val startTime = System.currentTimeMillis()
+    val rnd = new Random()
+
+
+    def run() {
+      val tweetsAndRelated = tweetSystem.requestTweets(userName)
+
+      val retweetDone = for {
+        tweets <- tweetsAndRelated.tweets
+        retweet <- tweetSystem.requestRetweet(tweets(rnd.nextInt(tweets.length)), "UserNo " + rnd.nextInt(AmountOfUsers))
+      } yield retweet
+
+      val relatedData = tweetsAndRelated.relatedTweets
+
+      val allDone = for {
+        rd <- relatedData
+        rt <- retweetDone
+      } yield ()
+
+      allDone.onSuccess {
+        case _ => {
+          println("Requests finished in " + (System.currentTimeMillis() - startTime))
+        }
+      }
+
+    }
+
 
   }
 
@@ -129,13 +187,6 @@ object WorstBenchmarkInTheWorld extends App {
 }
 
 
+case object Start
 
 
-class Request(user: String) {
-  val startTime = System.currentTimeMillis()
-
-
-
-
-
-}
