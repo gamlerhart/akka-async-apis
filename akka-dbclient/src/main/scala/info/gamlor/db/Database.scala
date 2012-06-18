@@ -5,6 +5,7 @@ import org.adbcj._
 import akka.dispatch.{Promise, Future, ExecutionContext}
 import collection.immutable.HashMap
 import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils.Collections
+import java.util.concurrent.Executors
 
 /**
  * @author roman.stoffel@gamlor.info

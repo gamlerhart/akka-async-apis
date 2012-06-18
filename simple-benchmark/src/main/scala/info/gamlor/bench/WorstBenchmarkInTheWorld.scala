@@ -13,7 +13,7 @@ import info.gamlor.db.{DatabaseAccess, DBConnection, Database}
  */
 
 object WorstBenchmarkInTheWorld extends App {
-  private val AmountOfUsers = 20000
+  private val AmountOfUsers = 200000
 
   implicit val akkaSystem = ActorSystem("benchmark", ConfigFactory.load().getConfig("benchmark"))
 
@@ -23,17 +23,18 @@ object WorstBenchmarkInTheWorld extends App {
   def main() {
 
     //    val requestFullFiller = new NullFullfiller(akkaSystem)
+//    val requestFullFiller = new WithPlainJDBC(akkaSystem)
     val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
-    val setupFuture = setup(requestFullFiller.dbSupport)
-
-    Await.result(setupFuture, 10 minutes)
+//    val setupFuture = setup(Database(akkaSystem))
+//
+//    Await.result(setupFuture, 20 minutes)
     println("Setup Done")
 
 
     runBenchmark(requestFullFiller)
 
-    Thread.sleep(60000)
-    Thread.sleep(60000)
+    Thread.sleep(30000)
+    Thread.sleep(30000)
 
     println(">>>>>>>>>>>>>>>>>Done?>>>>>>>>>")
     Thread.sleep(1000)
@@ -55,7 +56,8 @@ object WorstBenchmarkInTheWorld extends App {
   }
 
   def runBenchmark(requestFullFiller:RequestFullfiller) {
-    val loadCreators = akkaSystem.actorOf(Props(new RequestSender(requestFullFiller)).withRouter(BroadcastRouter(30)))
+    val loadCreators = akkaSystem.actorOf(Props(new RequestSender(requestFullFiller))
+      .withRouter(BroadcastRouter(50)))
 
 
     loadCreators ! Start
@@ -70,9 +72,11 @@ object WorstBenchmarkInTheWorld extends App {
                                        `id` int(11) NOT NULL AUTO_INCREMENT,
                                        `message` varchar(255) NOT NULL,
                                        `userId` int(11) NOT NULL,
+                                       `retweetOf` int(11) NOT NULL,
                                        `postTS` bigint(20) NOT NULL ,
                                        PRIMARY KEY (`id`),
                                        KEY `userId` (`userId`),
+                                       KEY `retweetOf` (`retweetOf`),
                                        KEY `postTS` (`postTS`)
                                      ) ENGINE=InnoDB;""")
       - <- conn.executeUpdate( """CREATE TABLE IF NOT EXISTS `user` (
@@ -86,7 +90,7 @@ object WorstBenchmarkInTheWorld extends App {
   private def insertUsersAndPosts(connection: DBConnection): Future[Unit] = {
     val inserts = for {
       insertUser <- connection.prepareUpdate("INSERT INTO user(username) VALUES (?)")
-      insertPost <- connection.prepareUpdate("INSERT INTO messages(message,userId,postTS) VALUES (?,?,?)")
+      insertPost <- connection.prepareUpdate("INSERT INTO messages(message,userId,retweetOf,postTS) VALUES (?,?,?,?)")
       insertedUsers <- Future.sequence(
         for (i <- 0 to AmountOfUsers)
         yield insertUser.execute("UserNo " + i)
@@ -94,23 +98,29 @@ object WorstBenchmarkInTheWorld extends App {
       initialPost <- Future.sequence(
         for (user <- insertedUsers)
         yield insertPost.execute("#Hello I'm new here. Ths is like #Twitter",
-          user.generatedKeys(0, 0).getInt,
+          user.generatedKeys(0, 0).getInt,0,
           System.currentTimeMillis()))
       secondPost <- Future.sequence(
         for (user <- insertedUsers)
         yield insertPost.execute("#Love the number #" + user.generatedKeys(0, 0) + " the most",
-          user.generatedKeys(0, 0).getInt,
+          user.generatedKeys(0, 0).getInt,0,
           System.currentTimeMillis()))
       thirdPost <- Future.sequence(
         for (user <- insertedUsers)
-        yield insertPost.execute("This is my #third entry",
-          user.generatedKeys(0, 0).getInt,
-          System.currentTimeMillis()))
+        yield {
+          val rtOf = (Math.random * AmountOfUsers).asInstanceOf[Long]
+          insertPost.execute("RT of some other tweet no: "+rtOf,
+            user.generatedKeys(0, 0).getInt,rtOf,
+            System.currentTimeMillis())
+        })
       lastEntry <- Future.sequence(
         for (user <- insertedUsers)
-        yield insertPost.execute("This is my #last entry",
-          user.generatedKeys(0, 0).getInt,
-          System.currentTimeMillis()))
+        yield {
+          val rtOf = (Math.random * AmountOfUsers*2).asInstanceOf[Long]
+          insertPost.execute("Last RT of Mine: "+rtOf,
+            user.generatedKeys(0, 0).getInt,rtOf,
+            System.currentTimeMillis())
+        })
 
     } yield secondPost
 
@@ -119,7 +129,7 @@ object WorstBenchmarkInTheWorld extends App {
 
 
   class RequestSender(tweetSystem: RequestFullfiller) extends Actor {
-    private var amountOfRounds = 60
+    private var amountOfRounds = 30
     private val rnd = new Random()
 
     override def preStart() {
@@ -165,16 +175,17 @@ object WorstBenchmarkInTheWorld extends App {
         retweet <- tweetSystem.requestRetweet(tweets(rnd.nextInt(tweets.length)), "UserNo " + rnd.nextInt(AmountOfUsers))
       } yield retweet
 
-      val relatedData = tweetsAndRelated.relatedTweets
 
       val allDone = for {
-        rd <- relatedData
+        _ <- tweetsAndRelated.tweets
+        _ <- tweetsAndRelated.relatedTweets
+        _ <- tweetsAndRelated.amountOfTweets
         rt <- retweetDone
       } yield ()
 
       allDone.onSuccess {
         case _ => {
-          println("Requests finished in " + (System.currentTimeMillis() - startTime))
+          println("ALL DONE " + (System.currentTimeMillis() - startTime))
         }
       }
 
