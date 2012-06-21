@@ -23,8 +23,8 @@ object WorstBenchmarkInTheWorld extends App {
   def main() {
 
     //    val requestFullFiller = new NullFullfiller(akkaSystem)
-//    val requestFullFiller = new WithPlainJDBC(akkaSystem)
-    val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
+    val requestFullFiller = new WithPlainJDBC(akkaSystem)
+//    val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
 //    val setupFuture = setup(Database(akkaSystem))
 //
 //    Await.result(setupFuture, 20 minutes)
@@ -34,10 +34,11 @@ object WorstBenchmarkInTheWorld extends App {
     runBenchmark(requestFullFiller)
 
     Thread.sleep(30000)
-    Thread.sleep(30000)
+    Thread.sleep(10000)
 
     println(">>>>>>>>>>>>>>>>>Done?>>>>>>>>>")
     Thread.sleep(1000)
+    System.exit(0)
 
 
   }
@@ -57,7 +58,7 @@ object WorstBenchmarkInTheWorld extends App {
 
   def runBenchmark(requestFullFiller:RequestFullfiller) {
     val loadCreators = akkaSystem.actorOf(Props(new RequestSender(requestFullFiller))
-      .withRouter(BroadcastRouter(50)))
+      .withRouter(BroadcastRouter(20)))
 
 
     loadCreators ! Start
@@ -142,7 +143,7 @@ object WorstBenchmarkInTheWorld extends App {
         amountOfRounds = amountOfRounds - 1
 
         if (amountOfRounds > 0) {
-          context.system.scheduler.scheduleOnce(950 + rnd.nextInt(100) millis, self, NewRequest)
+          context.system.scheduler.scheduleOnce(200 + rnd.nextInt(800) millis, self, NewRequest)
         } else {
           context.stop(self)
         }
@@ -169,7 +170,6 @@ object WorstBenchmarkInTheWorld extends App {
 
     def run() {
       val tweetsAndRelated = tweetSystem.requestTweets(userName)
-
       val retweetDone = for {
         tweets <- tweetsAndRelated.tweets
         retweet <- tweetSystem.requestRetweet(tweets(rnd.nextInt(tweets.length)), "UserNo " + rnd.nextInt(AmountOfUsers))

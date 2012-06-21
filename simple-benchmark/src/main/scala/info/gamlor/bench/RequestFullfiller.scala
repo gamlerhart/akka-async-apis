@@ -80,12 +80,17 @@ class AysncDBApiFullfiller(val system: ActorSystem) extends RequestFullfiller {
             "AND original.userId = user.id " +
             "AND retweets.retweetOf = original.userId ")
           _ <- {
-            val directTweets = loadTweetsForUser(loadedTweets, forUser, loadTweetsStatement)
-            val indirectTweets = loadTweetsForUser(similarTwitterers, similarUser, loadTweetsStatement)
+            val tweetLoadingDone = {
+              val directTweets = loadTweetsForUser(loadedTweets, forUser, loadTweetsStatement)
+              val indirectTweets = loadTweetsForUser(similarTwitterers, similarUser, loadTweetsStatement)
+              for{
+                directTweetsDone <- directTweets
+                indirectTweets <- indirectTweets
+              } yield ()
+            }
             val stats = statsPromise.completeWith(statsStatement.execute(forUser).map(rs=>rs(0,0).getInt))
             for {
-              _ <- directTweets
-              _ <- indirectTweets
+              _ <- tweetLoadingDone
               _ <- stats
             } yield "Done"
 
@@ -125,21 +130,21 @@ class AysncDBApiFullfiller(val system: ActorSystem) extends RequestFullfiller {
 class WithPlainJDBC(val system: ActorSystem) extends RequestFullfiller {
 
   private implicit val dispatcher = system.dispatcher
-  val jdbc = new Object{
-//      val boneCP = new BoneCPConfig()
-//      boneCP.setJdbcUrl("jdbc:mysql://localhost/dbbench?characterEncoding=UTF-8")
-//      boneCP.setUsername("dbbench")
-//      boneCP.setPassword("dbbench")
-//      boneCP.setPartitionCount(4)
-//      boneCP.setMaxConnectionsPerPartition(64)
-//
-//    new BoneCP(boneCP)
+  val jdbc = {
+      val boneCP = new BoneCPConfig()
+      boneCP.setJdbcUrl("jdbc:mysql://localhost/dbbench?characterEncoding=UTF-8")
+      boneCP.setUsername("dbbench")
+      boneCP.setPassword("dbbench")
+      boneCP.setPartitionCount(4)
+      boneCP.setMaxConnectionsPerPartition(64)
 
-    def getConnection() ={
-      DriverManager.getConnection(
-        "jdbc:mysql://localhost/dbbench?characterEncoding=UTF-8","dbbench","dbbench")
-    }
-  }
+    new BoneCP(boneCP) }
+//  val jdbc = new Object{
+//    def getConnection() ={
+//      DriverManager.getConnection(
+//        "jdbc:mysql://localhost/dbbench?characterEncoding=UTF-8","dbbench","dbbench")
+//    }
+//  }
   def requestTweets(forUser: String) = {
 
     val result =Future{
