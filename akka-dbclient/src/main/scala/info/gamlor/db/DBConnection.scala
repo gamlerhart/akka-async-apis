@@ -12,6 +12,9 @@ import scala.PartialFunction
  * @since 29.03.12
  */
 
+/**
+ * Wrap the given ADCBJ connection in a more Akka and Scala friendly connection.
+ */
 object DBConnection {
 
   def apply(connection: Connection)(implicit context: ExecutionContext): DBConnection = new DBConnection(connection, context)
@@ -112,6 +115,30 @@ class DBConnection(val connection: Connection, implicit val context: ExecutionCo
     completeWithAkkaFuture[T, T](() => connection.executeQuery(sql, eventHandler, accumulator), rs => rs)
   }
 
+  /**
+   * Execute the query, and handle the incoming data stream with a partial function.
+   *
+   * This allows you to deal with the incoming data via pattern matching. You can accumulate a result type
+   * by returning a value. That value will be passed in on the next data event.
+   *
+   * For example:
+   * <pre>
+       val resultFuture = connection.executeQuery("SELECT firstname FROM testTable" +
+           "WHERE firstname LIKE 'Roman'","data["){
+             case StartResults(existingData) =>existingData
+             case StartRow(existingData) =>existingData + "["
+             case AValue(value,existingData) =>existingData + value.getString + ", "
+             case EndRow(existingData) =>existingData +"]"
+             case EndResults(existingData) =>existingData +"]"
+           }
+   * </pre>
+   *
+   * @param sql the query to execute
+   * @param initialValue the value, which will be passed the first time the partial function is called
+   * @param eventHandler the event handler, to deal with the data
+   * @tparam T type of the data to return
+   * @return
+   */
   def executeQuery[T](sql: String, initialValue: T)(eventHandler: PartialFunction[DBResultEvents[T], T]): Future[T] = {
     completeWithAkkaFuture[MutableRef[T], T](() => connection.executeQuery(sql,
       new PatternMatchResultHandler(eventHandler), new MutableRef(initialValue)), rs => rs.value)

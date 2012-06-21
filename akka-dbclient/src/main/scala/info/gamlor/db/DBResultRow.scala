@@ -8,6 +8,24 @@ import org.adbcj.{Field, Value, Row}
  * @since 30.03.12
  */
 
+/**
+ * Represents a row of a database result
+ *
+ * You can get the data by column indexes or column names:
+ *
+ * <pre>
+ *
+ *   val row = rs(0);
+ *
+ *   val firstColumn = row(0)
+ *   val nameColumn = row("name")
+ *
+ *   for(val value <- row){
+ *      println(value.getString)
+ *   }
+ *
+ * </pre>
+ */
 class DBResultRow(val row: Row) extends Seq[Value]{
   def get(index: Int):Value = row.get(index)
   def get(columnName: String):Value = apply(columnName)

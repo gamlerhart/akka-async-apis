@@ -83,16 +83,16 @@ class QueryTestCases extends SpecBaseWithDB {
       assert(iteratedThroughColumns.contains("1990"))
     }
 
-    it("get fields") {
+    it("get columns") {
       val resultFuture = selectAll()
 
       val result = Await.result(resultFuture, 5 seconds)
-      result.fields.size must be(4)
+      result.columns.size must be(4)
 
 
 
-      result.get(0)(result.fields(1)).getString must be("Joe")
-      result.get(0)(result.fields(2)).getString must be("Average")
+      result.get(0)(result.columns(1)).getString must be("Joe")
+      result.get(0)(result.columns(2)).getString must be("Average")
     }
     it("can query for spefic data") {
       val resultFuture = for {connection <- Database(system).connect()

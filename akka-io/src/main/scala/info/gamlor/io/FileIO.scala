@@ -97,7 +97,7 @@ object FileIO {
    * Opens the specified file and runs the code of the given closure. It will close the file
    * when the future which the closure returns finishes.
    *
-   * This is indended for doing multiple read operations and then close the file: for example:
+   * This is indented for doing multiple read operations and then close the file: for example:
    * <pre>val data = FileIO.withFile(TestFiles.inTestFolder("helloWorld.txt")){
         file=>{
           for{
