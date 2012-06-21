@@ -9,6 +9,32 @@ import org.adbcj.{Result, Value, ResultSet}
  * @since 30.03.12
  */
 
+/**
+ * Represent a immutable result set from the database.
+ *
+ * It can direcly be accessed like this:
+ *
+ * <pre>
+ * val result = connection.executeQuery("SELECT name FROM people")
+ *
+ * result.onSuccess{
+ *    case rs:DBResultList =>{
+ *      val firstRowFirstColumn = rs(0,0).
+ *      val secondRowSecondColumn = rs(1,1)
+ *      val columnByName = rs(1,"name")
+ *
+ *      val firstRow = rs(1)
+ *      val columns = rs.columns
+ *
+ *      for(row <- rs){
+ *        val name = row("name")
+ *      }
+ *    }
+ * }
+ *
+ * </pre>
+ **/
+
 class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
   def length = resultSet.size()
 
@@ -18,7 +44,11 @@ class DBResultList(val resultSet: ResultSet) extends Seq[DBResultRow] {
 
   def get(index:Int) = new DBResultRow(resultSet.get(index))
 
-  def fields = resultSet.getFields.toSeq
+  /**
+   * Returns all columns/columns for this result set
+   * @return sequence of the columns
+   */
+  def columns = resultSet.getFields.toSeq
 
   def iterator = {
     val iter = resultSet.iterator()
