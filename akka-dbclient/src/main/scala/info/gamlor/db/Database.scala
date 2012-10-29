@@ -50,8 +50,7 @@ object Database
       ConnectionManagerProvider.createConnectionManager(config.url,
         config.userName,
         config.passWord,
-        java.util.Collections.emptyMap(),
-        new info.gamlor.io.DelegateToContext(system.dispatcher))
+        java.util.Collections.emptyMap())
     val client = new DatabaseAccess(connectionManager, system.dispatcher)
     client
   }

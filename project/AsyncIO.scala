@@ -28,7 +28,7 @@ object AkkaAsyncModules extends Build  {
     settings = defaultSettings ++ Seq(
       parallelExecution in Test := false,
       libraryDependencies ++= Seq(akkaActors,httpLib, scalaTest, akkaTestKit, mockito,simpleTestServer)
-    ))dependsOn (akkaIO % "test->test")
+    )) dependsOn (akkaIO % "test->test")
 
   lazy val akkaDBClient: Project = Project(
     id = "akka-dbclient",
