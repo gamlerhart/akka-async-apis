@@ -50,7 +50,7 @@ object Database
       ConnectionManagerProvider.createConnectionManager(config.url,
         config.userName,
         config.passWord,
-        java.util.Collections.emptyMap())
+        config.properties)
     val client = new DatabaseAccess(connectionManager, system.dispatcher)
     client
   }
