@@ -7,6 +7,7 @@ import util.Random
 import akka.actor.{Props, Actor, ActorSystem}
 import akka.routing.BroadcastRouter
 import info.gamlor.db.{DatabaseAccess, DBConnection, Database}
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -23,23 +24,61 @@ object WorstBenchmarkInTheWorld extends App {
   def main() {
 
     //    val requestFullFiller = new NullFullfiller(akkaSystem)
-    val requestFullFiller = new WithPlainJDBC(akkaSystem)
-//    val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
+//    val requestFullFiller = new WithPlainJDBC(akkaSystem)
+    val requestFullFiller = new AysncDBApiFullfiller(akkaSystem)
 //    val setupFuture = setup(Database(akkaSystem))
 //
 //    Await.result(setupFuture, 20 minutes)
+
+    val testQuery = Database(akkaSystem).withConnection{
+      conn=>
+        conn.executeQuery("SELECT * FROM `user` LIMIT 0,1")
+    }
+    val rs = Await.result(testQuery, 5 minutes)
+    println("Test me"+rs(0)(0).getString)
     println("Setup Done")
 
+    connectTimeMeasuring(Database(akkaSystem))
 
-    runBenchmark(requestFullFiller)
 
-    Thread.sleep(30000)
-    Thread.sleep(10000)
+
+
+//    runBenchmark(requestFullFiller)
+//
+//    Thread.sleep(30000)
+//    Thread.sleep(10000)
 
     println(">>>>>>>>>>>>>>>>>Done?>>>>>>>>>")
     Thread.sleep(1000)
     System.exit(0)
 
+
+  }
+
+  def connectTimeMeasuring(dbAccess:DatabaseAccess){
+    val avg = new AtomicLong()
+    val sucesses = new AtomicLong()
+    for (i<-0 to 2000){
+      val startTime = System.currentTimeMillis()
+      val testQuery = Database(akkaSystem).withConnection{
+        conn=>
+          conn.executeQuery("SELECT * FROM `user` LIMIT 0,1")
+      }
+      testQuery onSuccess {
+        case data =>{
+          val usedTime=(System.currentTimeMillis()-startTime);
+          println("Select 1 in: "+usedTime)
+          avg.addAndGet(usedTime)
+          sucesses.incrementAndGet()
+        }
+      }
+      if (i%20==1){
+        Thread.sleep(20)
+      }
+    }
+
+    Thread.sleep(2000)
+    println("AVG time: "+(avg.get()/sucesses.get))
 
   }
 
@@ -58,7 +97,7 @@ object WorstBenchmarkInTheWorld extends App {
 
   def runBenchmark(requestFullFiller:RequestFullfiller) {
     val loadCreators = akkaSystem.actorOf(Props(new RequestSender(requestFullFiller))
-      .withRouter(BroadcastRouter(20)))
+      .withRouter(BroadcastRouter(4)))
 
 
     loadCreators ! Start
@@ -123,7 +162,7 @@ object WorstBenchmarkInTheWorld extends App {
             System.currentTimeMillis())
         })
 
-    } yield secondPost
+    } yield lastEntry
 
     inserts.map(r => ())
   }
@@ -170,10 +209,30 @@ object WorstBenchmarkInTheWorld extends App {
 
     def run() {
       val tweetsAndRelated = tweetSystem.requestTweets(userName)
+
+      tweetsAndRelated.tweets.onSuccess{
+        case _ => println("Tweets: " + (System.currentTimeMillis()-startTime))
+      } onFailure{
+        case x => {
+          x.printStackTrace()
+        }
+      }
+//      tweetsAndRelated.relatedTweets.onSuccess{
+//        case _ => println("Related: " + (System.currentTimeMillis()-startTime))
+//      }
+//      tweetsAndRelated.amountOfTweets.onSuccess{
+//        case _ => println("Stats: " + (System.currentTimeMillis()-startTime))
+//      }
+
       val retweetDone = for {
         tweets <- tweetsAndRelated.tweets
         retweet <- tweetSystem.requestRetweet(tweets(rnd.nextInt(tweets.length)), "UserNo " + rnd.nextInt(AmountOfUsers))
       } yield retweet
+
+
+//      retweetDone.onSuccess{
+//        case _ => println("Retweet: " + (System.currentTimeMillis()-startTime))
+//      }
 
 
       val allDone = for {

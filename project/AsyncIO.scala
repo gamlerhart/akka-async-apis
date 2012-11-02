@@ -47,7 +47,7 @@ object AkkaAsyncModules extends Build  {
         ajdbc,
         ajdbcJdbcBridgeForBenchmark,
         ajdbcMySQL,
-        mysqlForBenchmark,
+        ajdbcPool,
         netty,
         bonecp,
         lsf4j)
@@ -60,7 +60,7 @@ object AkkaAsyncModules extends Build  {
   lazy val defaultSettings = Defaults.defaultSettings ++ Seq(
     resolvers += "Typesafe Repo" at "http://repo.typesafe.com/typesafe/releases/",
     resolvers += "Tools-Repo" at "http://scala-tools.org/repo-releases/",
-    resolvers +=  Resolver.file("Local Maven Repository", file(Path.userHome.absolutePath+"/.m2/repository")) transactional(),
+    resolvers +=  "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m2/repository",
     resolvers +=  "Gamlor-Repo" at "https://github.com/gamlerhart/gamlor-mvn/raw/master/snapshots",
     // compile options
     scalacOptions ++= Seq("-encoding", "UTF-8", "-deprecation", "-unchecked","-optimize"),
@@ -81,15 +81,15 @@ object Dependencies {
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
 
-  val ajdbc = "org.adbcj" % "adbcj-api" % "0.3.1-SNAPSHOT" changing()
-  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.3.1-SNAPSHOT" % "test" changing()
+  val ajdbc = "org.adbcj" % "adbcj-api" % "0.4.0-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.4.0-SNAPSHOT" % "test" changing()
   val h2DBForTests = "com.h2database" % "h2" % "1.3.161" % "test"
 
 
-  val ajdbcForBenchmark = "org.adbcj" % "mysql-async-driver" % "0.3.1-SNAPSHOT" changing()
-  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.3.1-SNAPSHOT"  changing()
-  val ajdbcMySQL= "org.adbcj" % "mysql-async-driver" % "0.3.1-SNAPSHOT"  changing()
-  val netty= "io.netty" % "netty" % "3.3.1.Final"
+  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.4.0-SNAPSHOT"  changing()
+  val ajdbcMySQL= "org.adbcj" % "mysql-async-driver" % "0.4.0-SNAPSHOT"  changing()
+  val ajdbcPool= "org.adbcj" % "adbcj-connection-pool" % "0.4.0-SNAPSHOT"  changing()
+  val netty= "io.netty" % "netty" % "3.5.9.Final"
   val lsf4j= "org.slf4j" % "slf4j-api" % "1.6.2"
   val mysqlForBenchmark = "mysql" % "mysql-connector-java" % "5.1.20"
   val bonecp = "com.jolbox" % "bonecp" % "0.7.1.RELEASE"

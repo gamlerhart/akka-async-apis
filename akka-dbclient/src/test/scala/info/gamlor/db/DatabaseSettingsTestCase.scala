@@ -23,6 +23,11 @@ class DatabaseSettingsTestCase extends Spec with ShouldMatchers {
       cgf.userName should be ("username")
       cgf.passWord should be ("password")
     }
+    it("adds to properties"){
+      val cgf = DatabaseSettings(ConfigFactory.load("configReaderTest"))
+      cgf.properties.get("pool.maxConnections") should be ("10")
+      cgf.properties.get("otherSetting.turbo") should be ("ofCourse")
+    }
   }
 
 }

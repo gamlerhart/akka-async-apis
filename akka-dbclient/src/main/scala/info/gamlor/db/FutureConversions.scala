@@ -1,7 +1,8 @@
 package info.gamlor.db
 
-import org.adbcj.{DbListener, DbFuture}
+import org.adbcj.{FutureState, DbListener, DbFuture}
 import akka.dispatch.{ExecutionContext, Promise}
+import java.util.concurrent.CancellationException
 
 /**
  * @author roman.stoffel@gamlor.info
@@ -17,10 +18,16 @@ trait FutureConversions {
     val akkaPromise = Promise[TResult]
     futureProducingOperation().addListener(new DbListener[TOrignalData] {
       def onCompletion(future: DbFuture[TOrignalData]) {
-        try {
-          akkaPromise.success(transformation(future.get()))
-        } catch {
-          case ex: Throwable => akkaPromise.failure(ex)
+        future.getState match {
+          case FutureState.SUCCESS =>{
+            akkaPromise.success(transformation(future.getResult))
+          }
+          case FutureState.FAILURE =>{
+            akkaPromise.failure(future.getException)
+          }
+          case FutureState.CANCELLED =>{
+            akkaPromise.failure(new CancellationException("Operation was cancelled"))
+          }
         }
       }
     })
