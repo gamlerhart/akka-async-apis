@@ -81,14 +81,14 @@ object Dependencies {
   val mockito = "org.mockito" % "mockito-core" % "1.9.0-rc1" % "test"
 
 
-  val ajdbc = "org.adbcj" % "adbcj-api" % "0.4.0-SNAPSHOT" changing()
-  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.4.0-SNAPSHOT" % "test" changing()
+  val ajdbc = "org.adbcj" % "adbcj-api" % "0.5.0-SNAPSHOT" changing()
+  val ajdbcJdbcBridgeForTests = "org.adbcj" % "adbcj-jdbc" % "0.5.0-SNAPSHOT" % "test" changing()
   val h2DBForTests = "com.h2database" % "h2" % "1.3.161" % "test"
 
 
-  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.4.0-SNAPSHOT"  changing()
-  val ajdbcMySQL= "org.adbcj" % "mysql-async-driver" % "0.4.0-SNAPSHOT"  changing()
-  val ajdbcPool= "org.adbcj" % "adbcj-connection-pool" % "0.4.0-SNAPSHOT"  changing()
+  val ajdbcJdbcBridgeForBenchmark= "org.adbcj" % "adbcj-jdbc" % "0.5.0-SNAPSHOT"  changing()
+  val ajdbcMySQL= "org.adbcj" % "mysql-async-driver" % "0.5.0-SNAPSHOT"  changing()
+  val ajdbcPool= "org.adbcj" % "adbcj-connection-pool" % "0.5.0-SNAPSHOT"  changing()
   val netty= "io.netty" % "netty" % "3.5.9.Final"
   val lsf4j= "org.slf4j" % "slf4j-api" % "1.6.2"
   val mysqlForBenchmark = "mysql" % "mysql-connector-java" % "5.1.20"
